@@ -244,17 +244,32 @@ The `--no-lock` option exists but is not recommended. The default flock-based lo
 
 ## Supported Entities
 
-| Entity | Type Key | Notes |
-|--------|----------|-------|
-| Orders | `order` | Full order data including addresses, items, payment |
-| Invoices | `invoice` | Requires parent order to be synced first |
-| Shipments | `shipment` | Requires parent order to be synced first |
-| Credit Memos | `creditmemo` | Requires parent order to be synced first |
-| Customers | `customer` | Including addresses |
-| Products | `product` | Simple, configurable, bundle, downloadable, virtual |
-| Categories | `category` | With full tree structure |
-| Newsletter | `newsletter` | Subscriber data |
-| Stock | `stock` | Inventory levels |
+| Entity | Type Key | Incremental | Notes |
+|--------|----------|-------------|-------|
+| Orders | `order` | ✅ | Full order data including addresses, items, payment |
+| Invoices | `invoice` | ✅ | Requires parent order to be synced first |
+| Shipments | `shipment` | ✅ | Requires parent order to be synced first |
+| Credit Memos | `creditmemo` | ✅ | Requires parent order to be synced first |
+| Customers | `customer` | ✅ | Including addresses |
+| Products | `product` | ✅ | Simple, configurable, bundle, downloadable, virtual |
+| Categories | `category` | ✅ | With full tree structure |
+| Newsletter | `newsletter` | ✅ | Subscriber data |
+| Stock | `stock` | ✅ | Inventory levels |
+
+### Not Yet Supported (Roadmap)
+
+| Entity | Status | Notes |
+|--------|--------|-------|
+| Attributes | Planned | Product attributes and options |
+| Attribute Sets | Planned | Attribute set definitions |
+| Customer Groups | Planned | Group definitions |
+| CMS Pages | Planned | Content pages |
+| CMS Blocks | Planned | Static blocks |
+| Reviews & Ratings | Planned | Product reviews |
+| Cart Price Rules | Planned | Promotions and coupons |
+| URL Rewrites | Not planned | Can be massive; regenerate on destination instead |
+
+**Note:** Incremental sync (`datasync:incremental`) only syncs entities tracked by the source module. For initial migration or foundational data (attributes, customer groups), use `datasync:sync` with the appropriate entity type.
 
 ## Architecture
 
@@ -328,10 +343,22 @@ Incremental sync (`datasync:incremental`) is significantly faster for ongoing sy
 
 ## Roadmap
 
+### Entity Support
+- [ ] Product Attributes (+ attribute options)
+- [ ] Attribute Sets (+ attribute groups)
+- [ ] Customer Groups
+- [ ] CMS Pages
+- [ ] CMS Blocks
+- [ ] Reviews & Ratings
+- [ ] Cart Price Rules (+ coupons)
+
+### Adapters
 - [ ] **PHP Proxy adapter** - HTTP API on source system to avoid direct DB connection (firewall-friendly)
 - [ ] Magento 2 source adapter
 - [ ] Shopify source adapter
 - [ ] WooCommerce source adapter
+
+### Features
 - [ ] Real-time webhook-based sync
 - [ ] Admin UI for sync management
 - [ ] Sync scheduling via admin
