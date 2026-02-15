@@ -82,41 +82,151 @@ CREATE TABLE datasync_change_tracker (
 
 ## CLI Commands
 
-### Full Sync
+### Full Sync (`datasync:sync`)
 
-Sync all entities of a specific type:
+Sync all entities of a specific type from a source system.
 
 ```bash
-# Sync all orders
-./maho datasync:sync order
-
-# Sync with filters
-./maho datasync:sync order --from-date="2024-01-01" --to-date="2024-12-31"
-
-# Dry run (preview only)
-./maho datasync:sync order --dry-run
-
-# Handle duplicates
-./maho datasync:sync order --on-duplicate=merge  # merge|skip|update|error
+./maho datasync:sync <entity> <source> [options]
 ```
 
-### Incremental Sync
+**Required Arguments:**
+| Argument | Description |
+|----------|-------------|
+| `entity` | Entity type: `product`, `customer`, `category`, `order`, `invoice`, `shipment`, `creditmemo`, `productattribute` |
+| `source` | Source system identifier (e.g., "legacy", "woocommerce", "csv") |
 
-Sync only changed records (requires change tracking):
+**Source Options:**
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--adapter` | `-a` | Source adapter type: `csv`, `openmage`, `woocommerce`, `shopify`, `magento2` (default: csv) |
+| `--file` | `-f` | CSV file path (required for csv adapter) |
+| `--url` | `-u` | Remote API URL (for API-based adapters) |
+| `--db-host` | | Database host for direct DB adapter (default: localhost) |
+| `--db-name` | | Database name for direct DB adapter |
+| `--db-user` | | Database username |
+| `--db-pass` | | Database password |
+| `--db-prefix` | | Table prefix (default: none) |
+| `--api-key` | `-k` | API key for authentication |
+| `--api-secret` | | API secret for authentication |
 
+**Behavior Options:**
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--on-duplicate` | `-d` | How to handle duplicates: `skip`, `update`, `merge`, `error` (default: error) |
+| `--dry-run` | | Validate without actually importing |
+| `--skip-invalid` | | Skip invalid records instead of failing |
+
+**Filter Options:**
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--limit` | `-l` | Limit number of records to import |
+| `--date-from` | | Import only records modified after date (YYYY-MM-DD) |
+| `--date-to` | | Import only records modified before date (YYYY-MM-DD) |
+| `--entity-ids` | | Sync specific entity IDs (comma-separated: "123,456,789") |
+| `--increment-ids` | | Sync specific increment IDs (comma-separated: "100001,100002") |
+
+**Product-Specific Options:**
+| Option | Description |
+|--------|-------------|
+| `--auto-link-configurables` | Auto-link simple products to configurables based on CSV position |
+| `--options-mode` | Custom options handling: `replace`, `merge`, `append` (default: replace) |
+| `--image-base-url` | Base URL for downloading images |
+| `--image-base-path` | Base path for copying local images |
+| `--stock` | Stock sync mode: `include` (default), `exclude`, `only` |
+
+**Examples:**
+```bash
+# Import orders from CSV
+./maho datasync:sync order csv_import -a csv -f /path/to/orders.csv
+
+# Sync products from another OpenMage database
+./maho datasync:sync product legacy -a openmage --db-host=192.168.1.100 \
+    --db-name=legacy_db --db-user=readonly --db-pass=secret
+
+# Import customers, update existing ones
+./maho datasync:sync customer migration -a csv -f customers.csv --on-duplicate=merge
+
+# Dry run with date filter
+./maho datasync:sync order legacy -a openmage --date-from="2024-01-01" \
+    --date-to="2024-06-30" --dry-run -v
+
+# Import products, skip stock updates
+./maho datasync:sync product csv_import -a csv -f products.csv --stock=exclude
+```
+
+### Incremental Sync (`datasync:incremental`)
+
+Sync only changed records using the tracker table (requires change tracking setup on source).
+
+```bash
+./maho datasync:incremental [options]
+```
+
+**Options:**
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--entity` | `-e` | Sync only specific entity type (order, invoice, shipment, etc.) |
+| `--mark-synced` | | Mark tracker records as synced after successful import |
+| `--limit` | `-l` | Limit number of records to process per entity type |
+| `--dry-run` | | Show what would be synced without making changes |
+| `--stock` | | Stock sync mode: `include` (default), `exclude`, `only` |
+| `--no-lock` | | Skip lock file check (not recommended) |
+| `--db-host` | | Live database host (or set DATASYNC_LIVE_HOST in .env.local) |
+| `--db-name` | | Live database name (or set DATASYNC_LIVE_DB in .env.local) |
+| `--db-user` | | Live database user (or set DATASYNC_LIVE_USER in .env.local) |
+| `--db-pass` | | Live database password (or set DATASYNC_LIVE_PASS in .env.local) |
+
+**Verbosity:**
+| Flag | Description |
+|------|-------------|
+| `-v` | Verbose output (show progress) |
+| `-vv` | Very verbose (show individual entity sync details) |
+
+**Entity Processing Order:**
+
+Incremental sync automatically processes entities in dependency order:
+1. customer
+2. order
+3. invoice
+4. shipment
+5. creditmemo
+6. newsletter
+7. product
+8. stock
+9. category
+
+**Examples:**
 ```bash
 # Sync all pending changes
-./maho datasync:incremental
-
-# Sync specific entity types
-./maho datasync:incremental --entity=order
-
-# Mark records as synced after successful import
 ./maho datasync:incremental --mark-synced
 
-# Verbose output
-./maho datasync:incremental -vv
+# Sync only orders (with verbose output)
+./maho datasync:incremental --entity=order --mark-synced -vv
+
+# Preview what would be synced
+./maho datasync:incremental --dry-run
+
+# Sync everything except stock
+./maho datasync:incremental --stock=exclude --mark-synced
+
+# Sync only stock updates
+./maho datasync:incremental --stock=only --mark-synced
+
+# Limit to 100 records per entity type
+./maho datasync:incremental --limit=100 --mark-synced
 ```
+
+### Cron Integration
+
+Add to crontab for continuous synchronization:
+
+```bash
+# Run incremental sync every 5 minutes
+*/5 * * * * cd /var/www/html && ./maho datasync:incremental --mark-synced >> var/log/datasync.log 2>&1
+```
+
+The `--no-lock` option exists but is not recommended. The default flock-based locking prevents concurrent runs.
 
 ## Supported Entities
 
