@@ -61,6 +61,37 @@ DATASYNC_LIVE_PASS=your-password
 DATASYNC_LIVE_DB=your_source_database
 ```
 
+#### Security Warnings
+
+1. **Block `.env*` files in your web server config:**
+
+   **Apache (.htaccess or vhost):**
+   ```apache
+   <FilesMatch "^\.env">
+       Require all denied
+   </FilesMatch>
+   ```
+
+   **Nginx:**
+   ```nginx
+   location ~ /\.env {
+       deny all;
+       return 404;
+   }
+   ```
+
+2. **Add `.env.local` to `.gitignore`** - never commit credentials to version control
+
+3. **Restrict file permissions:**
+   ```bash
+   chmod 600 .env.local
+   chown www-data:www-data .env.local
+   ```
+
+4. **Use a read-only database user** for the source connection - DataSync only needs SELECT access (plus UPDATE/DELETE on `datasync_change_tracker` to mark records as synced)
+
+5. **Don't pass credentials via command line** - they appear in process lists (`ps aux`). Use `.env.local` instead
+
 ### Source Module (for Incremental Sync)
 
 To use incremental sync, install the **DataSync Tracker** module on your **source** OpenMage/Magento 1 system:
