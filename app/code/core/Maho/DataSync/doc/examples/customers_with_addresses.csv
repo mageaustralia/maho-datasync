@@ -1,0 +1,8 @@
+entity_id,email,firstname,lastname,middlename,prefix,suffix,gender,dob,group_id,store_id,website_id,taxvat,billing_firstname,billing_lastname,billing_company,billing_street,billing_city,billing_region,billing_postcode,billing_country_id,billing_telephone,billing_fax,shipping_firstname,shipping_lastname,shipping_company,shipping_street,shipping_city,shipping_region,shipping_postcode,shipping_country_id,shipping_telephone,shipping_fax,same_as_billing
+1,john.doe@example.com,John,Doe,Michael,Mr,Jr,1,1985-03-15,1,1,1,,John,Doe,Acme Corp,123 Main Street,Sydney,NSW,2000,AU,0412345678,0212345678,John,Doe,Acme Corp,456 Warehouse Rd,Melbourne,VIC,3000,AU,0498765432,,0
+2,jane.smith@example.com,Jane,Smith,,Ms,,2,1990-07-22,1,1,1,,Jane,Smith,,789 Queen St,Brisbane,QLD,4000,AU,0423456789,,,,,,,,,,,1
+3,bob.wilson@example.com,Bob,Wilson,,,,1,1978-11-30,2,1,1,ABN12345678,Bob,Wilson,Wilson Industries,"100 Industrial Park
+Building B
+Suite 42",Perth,WA,6000,AU,0434567890,,Bob,Wilson,,200 Home Ave,Adelaide,SA,5000,AU,0445678901,,0
+4,sarah.jones@example.com,Sarah,Jones,Anne,Dr,,2,1982-01-10,1,4,2,,Sarah,Jones,Medical Centre,50 Health St,Darwin,NT,0800,AU,0456789012,,,,,,,,,,,1
+5,guest.customer@example.com,Guest,Customer,,,,0,,1,1,1,,,,,,,,,,,,,,,,,,,,,

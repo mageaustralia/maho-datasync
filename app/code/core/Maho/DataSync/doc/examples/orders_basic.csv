@@ -1,0 +1,3 @@
+entity_id,increment_id,customer_email,customer_firstname,customer_lastname,status,state,grand_total,base_grand_total,subtotal,tax_amount,shipping_amount,shipping_method,payment_method,created_at,billing_firstname,billing_lastname,billing_street,billing_city,billing_region,billing_postcode,billing_country_id,billing_telephone,same_as_billing
+1,ORD-001,john@example.com,John,Doe,pending,new,109.95,109.95,89.95,9.00,10.00,flatrate_flatrate,checkmo,2024-01-15 10:30:00,John,Doe,123 Main St,Sydney,NSW,2000,AU,0412345678,1
+2,ORD-002,jane@example.com,Jane,Smith,processing,processing,199.00,199.00,179.00,20.00,0.00,freeshipping_freeshipping,checkmo,2024-01-16 14:00:00,Jane,Smith,456 Queen St,Brisbane,QLD,4000,AU,0423456789,1

@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Maho DataSync Module
+ *
+ * Synchronizes data from external systems (OpenMage, WooCommerce, CSV, etc.) into Maho.
+ * Features adapter pattern for multi-platform support, entity ID mapping registry,
+ * and delta sync capabilities.
+ *
+ * @category   Maho
+ * @package    Maho_DataSync
+ */
+-->
+<config>
+    <modules>
+        <Maho_DataSync>
+            <active>true</active>
+            <codePool>core</codePool>
+            <depends>
+                <Mage_Core/>
+                <Mage_Customer/>
+                <Mage_Sales/>
+                <Mage_Catalog/>
+            </depends>
+        </Maho_DataSync>
+    </modules>
+</config>

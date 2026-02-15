@@ -1,0 +1,262 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Maho DataSync Module Configuration
+ *
+ * @category   Maho
+ * @package    Maho_DataSync
+ */
+-->
+<config>
+    <modules>
+        <Maho_DataSync>
+            <version>1.1.0</version>
+        </Maho_DataSync>
+    </modules>
+
+    <global>
+        <models>
+            <datasync>
+                <class>Maho_DataSync_Model</class>
+                <resourceModel>datasync_resource</resourceModel>
+            </datasync>
+            <datasync_resource>
+                <class>Maho_DataSync_Model_Resource</class>
+                <entities>
+                    <registry>
+                        <table>datasync_entity_registry</table>
+                    </registry>
+                    <delta>
+                        <table>datasync_delta_state</table>
+                    </delta>
+                </entities>
+            </datasync_resource>
+        </models>
+
+        <blocks>
+            <datasync>
+                <class>Maho_DataSync_Block</class>
+            </datasync>
+        </blocks>
+
+        <helpers>
+            <datasync>
+                <class>Maho_DataSync_Helper</class>
+            </datasync>
+        </helpers>
+
+        <resources>
+            <datasync_setup>
+                <setup>
+                    <module>Maho_DataSync</module>
+                </setup>
+                <connection>
+                    <use>core_setup</use>
+                </connection>
+            </datasync_setup>
+            <datasync_write>
+                <connection>
+                    <use>core_write</use>
+                </connection>
+            </datasync_write>
+            <datasync_read>
+                <connection>
+                    <use>core_read</use>
+                </connection>
+            </datasync_read>
+        </resources>
+
+        <!-- Registered Adapters -->
+        <datasync>
+            <adapters>
+                <csv>
+                    <class>datasync/adapter_csv</class>
+                    <label>CSV File</label>
+                    <description>Import from CSV files</description>
+                </csv>
+                <openmage>
+                    <class>datasync/adapter_openMage</class>
+                    <label>OpenMage Database</label>
+                    <description>Direct database connection to OpenMage/Magento 1</description>
+                </openmage>
+                <woocommerce>
+                    <class>datasync/adapter_woocommerce</class>
+                    <label>WooCommerce (Stub)</label>
+                    <description>WooCommerce REST API - Not yet implemented</description>
+                </woocommerce>
+                <magento2>
+                    <class>datasync/adapter_magento2</class>
+                    <label>Magento 2 (Stub)</label>
+                    <description>Magento 2 REST API - Not yet implemented</description>
+                </magento2>
+                <shopify>
+                    <class>datasync/adapter_shopify</class>
+                    <label>Shopify (Stub)</label>
+                    <description>Shopify Admin API - Not yet implemented</description>
+                </shopify>
+            </adapters>
+
+            <!-- Registered Entity Handlers -->
+            <entities>
+                <!-- Foundation entities (no dependencies) -->
+                <product_attribute>
+                    <class>datasync/entity_productAttribute</class>
+                    <label>Product Attributes</label>
+                    <order>5</order>
+                </product_attribute>
+                <category>
+                    <class>datasync/entity_category</class>
+                    <label>Categories</label>
+                    <order>10</order>
+                </category>
+                <customer>
+                    <class>datasync/entity_customer</class>
+                    <label>Customers</label>
+                    <order>15</order>
+                </customer>
+
+                <!-- Newsletter may depend on customer -->
+                <newsletter>
+                    <class>datasync/entity_newsletter</class>
+                    <label>Newsletter Subscribers</label>
+                    <order>16</order>
+                    <depends>customer</depends>
+                </newsletter>
+
+                <!-- Product depends on attributes and categories -->
+                <product>
+                    <class>datasync/entity_product</class>
+                    <label>Products</label>
+                    <order>20</order>
+                    <depends>product_attribute,category</depends>
+                </product>
+
+                <!-- Order depends on customer and product -->
+                <order>
+                    <class>datasync/entity_order</class>
+                    <label>Orders</label>
+                    <order>30</order>
+                    <depends>customer,product</depends>
+                </order>
+
+                <!-- Invoice depends on order -->
+                <invoice>
+                    <class>datasync/entity_invoice</class>
+                    <label>Invoices</label>
+                    <order>31</order>
+                    <depends>order</depends>
+                </invoice>
+
+                <!-- Shipment depends on order -->
+                <shipment>
+                    <class>datasync/entity_shipment</class>
+                    <label>Shipments</label>
+                    <order>32</order>
+                    <depends>order</depends>
+                </shipment>
+
+                <!-- Credit Memo depends on order (and optionally invoice) -->
+                <creditmemo>
+                    <class>datasync/entity_creditmemo</class>
+                    <label>Credit Memos</label>
+                    <order>33</order>
+                    <depends>order,invoice</depends>
+                </creditmemo>
+
+                <!-- Review depends on customer and product -->
+                <review>
+                    <class>datasync/entity_review</class>
+                    <label>Product Reviews</label>
+                    <order>40</order>
+                    <depends>customer,product</depends>
+                </review>
+                <!-- Rules are standalone -->
+                <shopping_cart_rule>
+                    <class>datasync/entity_shoppingCartRule</class>
+                    <label>Shopping Cart Price Rules</label>
+                    <order>50</order>
+                </shopping_cart_rule>
+            </entities>
+
+            <!-- Grid Sync Field Mappings: These define how to populate extended grid columns after import -->
+            <!-- Run: ./maho datasync:grid:sync with id-from option to apply these mappings -->
+            <grid_sync>
+                <order>
+                    <!-- From shipping address -->
+                    <szy_country>
+                        <source_table>sales/order_address</source_table>
+                        <source_column>country_id</source_column>
+                        <join_condition>address_type = 'shipping'</join_condition>
+                    </szy_country>
+                    <szy_region>
+                        <source_table>sales/order_address</source_table>
+                        <source_column>region</source_column>
+                        <join_condition>address_type = 'shipping'</join_condition>
+                    </szy_region>
+                    <szy_postcode>
+                        <source_table>sales/order_address</source_table>
+                        <source_column>postcode</source_column>
+                        <join_condition>address_type = 'shipping'</join_condition>
+                    </szy_postcode>
+                    <!-- From payment -->
+                    <szy_payment_method>
+                        <source_table>sales/order_payment</source_table>
+                        <source_column>method</source_column>
+                    </szy_payment_method>
+                    <payment_method>
+                        <source_table>sales/order_payment</source_table>
+                        <source_column>method</source_column>
+                    </payment_method>
+                    <!-- From order -->
+                    <szy_shipping_method>
+                        <source_table>sales/order</source_table>
+                        <source_column>shipping_method</source_column>
+                    </szy_shipping_method>
+                    <szy_shipping_description>
+                        <source_table>sales/order</source_table>
+                        <source_column>shipping_description</source_column>
+                    </szy_shipping_description>
+                </order>
+            </grid_sync>
+        </datasync>
+    </global>
+
+    <adminhtml>
+        <translate>
+            <modules>
+                <Maho_DataSync>
+                    <files>
+                        <default>Maho_DataSync.csv</default>
+                    </files>
+                </Maho_DataSync>
+            </modules>
+        </translate>
+    </adminhtml>
+
+    <crontab>
+        <jobs>
+            <datasync_delta_sync>
+                <schedule>
+                    <config_path>datasync/cron/schedule</config_path>
+                </schedule>
+                <run>
+                    <model>datasync/cron::runDeltaSync</model>
+                </run>
+            </datasync_delta_sync>
+        </jobs>
+    </crontab>
+
+    <default>
+        <datasync>
+            <general>
+                <enabled>0</enabled>
+                <log_level>3</log_level> <!-- 1=Error, 2=Warning, 3=Info, 4=Debug -->
+            </general>
+            <cron>
+                <enabled>0</enabled>
+                <schedule>0 */4 * * *</schedule> <!-- Every 4 hours -->
+                <entity_types>customer,order</entity_types>
+            </cron>
+        </datasync>
+    </default>
+</config>

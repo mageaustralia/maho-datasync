@@ -1,0 +1,40 @@
+{
+    "name": "mageaustralia/maho-datasync",
+    "description": "Data synchronization module for Maho/OpenMage - sync data between OpenMage instances with full entity support",
+    "type": "maho-module",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "MageAustralia",
+            "email": "dev@mageaustralia.com"
+        }
+    ],
+    "keywords": [
+        "maho",
+        "openmage",
+        "magento",
+        "data-sync",
+        "migration",
+        "import",
+        "export"
+    ],
+    "homepage": "https://github.com/mageaustralia/maho-datasync",
+    "require": {
+        "php": ">=8.2",
+        "mahocommerce/maho": ">=24.10.0"
+    },
+    "autoload": {
+        "psr-0": {
+            "Maho_DataSync": "app/code/core/Maho/DataSync"
+        },
+        "files": [
+            "lib/MahoCLI/Commands/DatasyncSync.php",
+            "lib/MahoCLI/Commands/DatasyncIncremental.php"
+        ]
+    },
+    "extra": {
+        "maho-module": {
+            "module-xml": "app/etc/modules/Maho_DataSync.xml"
+        }
+    }
+}
