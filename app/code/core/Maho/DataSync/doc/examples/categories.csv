@@ -1,0 +1,8 @@
+entity_id,parent_id,name,description,url_key,is_active,include_in_menu,position,meta_title,meta_description
+3,2,Clothing,Browse our clothing collection,clothing,1,1,1,Shop Clothing,Shop our clothing collection
+5,3,Shirts,T-shirts and casual shirts,shirts,1,1,1,Shop Shirts,Browse t-shirts and casual shirts
+6,3,Pants,Jeans and casual pants,pants,1,1,2,Shop Pants,Browse jeans and casual pants
+7,3,Accessories,Hats caps and accessories,accessories,1,1,3,Shop Accessories,Browse hats caps and accessories
+12,5,T-Shirts,Casual t-shirts,t-shirts,1,1,1,T-Shirts,Casual t-shirts for men and women
+15,6,Jeans,Denim jeans,jeans,1,1,1,Jeans,Quality denim jeans
+20,2,Digital Products,Downloadable digital products,digital-products,1,1,5,Digital Products,Downloadable products and guides

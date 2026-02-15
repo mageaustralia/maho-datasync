@@ -1,0 +1,6 @@
+entity_id,sku,name,description,short_description,price,special_price,cost,qty,is_in_stock,weight,status,visibility,tax_class_id,attribute_set_id,type_id,url_key,meta_title,meta_description,category_ids
+1001,DEMO-SHIRT-BLU-M,Blue T-Shirt Medium,"Premium cotton t-shirt in blue color. Comfortable fit for everyday wear.",Blue cotton t-shirt,29.95,24.95,12.00,100,1,0.5,1,4,2,4,simple,blue-t-shirt-medium,Blue T-Shirt,Premium blue cotton t-shirt,"3,5,12"
+1002,DEMO-SHIRT-RED-L,Red T-Shirt Large,"Premium cotton t-shirt in red color. Comfortable fit for everyday wear.",Red cotton t-shirt,29.95,,12.00,75,1,0.5,1,4,2,4,simple,red-t-shirt-large,Red T-Shirt,Premium red cotton t-shirt,"3,5,12"
+1003,DEMO-JEANS-BLK-32,Black Jeans 32,"Classic black denim jeans. Slim fit with stretch comfort.",Black slim fit jeans,79.95,69.95,35.00,50,1,0.8,1,4,2,4,simple,black-jeans-32,Black Jeans,Classic black denim jeans,"3,6,15"
+1004,DEMO-HAT-WHT,White Baseball Cap,"Adjustable white baseball cap with embroidered logo.",White baseball cap,19.95,,8.00,200,1,0.2,1,4,2,4,simple,white-baseball-cap,White Cap,Adjustable white baseball cap,"3,7"
+1005,DEMO-DIGITAL-GUIDE,Style Guide eBook,"Digital style guide with fashion tips and outfit ideas. Instant PDF download.",Digital fashion guide,9.95,,0.00,999,1,0,1,4,0,4,virtual,style-guide-ebook,Style Guide,Digital fashion style guide PDF,"3,20"

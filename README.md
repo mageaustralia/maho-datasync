@@ -20,6 +20,22 @@ Data synchronization module for [Maho](https://github.com/mahocommerce/maho) and
 - **Backup & Disaster Recovery**: Replicate critical data to secondary instances
 - **Data Migration**: Migrate data between OpenMage instances during upgrades or consolidations
 
+## Import Order (Important!)
+
+Entities must be imported in the correct order due to foreign key dependencies:
+
+```
+1. Foundation    → Attributes, Attribute Sets, Customer Groups
+2. Structure     → Categories
+3. Catalog       → Simple Products → Configurable/Grouped/Bundle Products
+4. Customers     → Customers (with addresses)
+5. Sales         → Orders → Invoices → Shipments → Credit Memos
+6. Marketing     → Newsletter Subscribers
+7. Inventory     → Stock Updates
+```
+
+See [doc/IMPORT_ORDER.md](app/code/core/Maho/DataSync/doc/IMPORT_ORDER.md) for detailed dependency documentation.
+
 ## Requirements
 
 - PHP 8.2+
@@ -135,6 +151,28 @@ Sync only changed records (requires change tracking):
 - **Adapter**: Connects to source system and reads entity data
 - **Entity Handlers**: Transform and import specific entity types
 - **Registry**: Tracks source-to-destination ID mappings for foreign key resolution
+
+## Examples
+
+The `doc/examples/` directory contains comprehensive examples:
+
+### CSV Examples
+- `customers_basic.csv` - Minimal customer import
+- `customers_with_addresses.csv` - Full customer with billing/shipping
+- `orders_basic.csv` - Simple order import
+- `orders_with_items.csv` - Orders with line items
+- `products_simple.csv` - Simple product import
+- `categories.csv` - Category structure
+- `newsletter_subscribers.csv` - Newsletter subscriber import
+
+### PHP Array Examples
+- `php_array_examples.php` - Customers, orders, products, invoices, shipments
+- `products_advanced.php` - Configurable, grouped, bundle, downloadable products with images
+- `attributes.php` - Product attributes and attribute sets
+
+### Documentation
+- `IMPORT_ORDER.md` - Required import sequence and dependency map
+- `examples/README.md` - Detailed field documentation
 
 ## Roadmap
 
