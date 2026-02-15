@@ -61,23 +61,37 @@ DATASYNC_LIVE_PASS=your-password
 DATASYNC_LIVE_DB=your_source_database
 ```
 
-### Change Tracking (for Incremental Sync)
+### Source Module (for Incremental Sync)
 
-Run the setup script on your **source** database to create the change tracker table and triggers:
+To use incremental sync, install the **DataSync Tracker** module on your **source** OpenMage/Magento 1 system:
+
+```bash
+# Copy from source-module/ directory in this repo
+cp -r source-module/app/etc/modules/Maho_DataSyncTracker.xml /path/to/source-magento/app/etc/modules/
+cp -r source-module/app/code/community/Maho /path/to/source-magento/app/code/community/
+
+# Clear cache
+rm -rf /path/to/source-magento/var/cache/*
+```
+
+This module:
+- Creates the `datasync_change_tracker` table automatically
+- Uses Magento events to track entity changes (customers, orders, products, etc.)
+- Handles rapid successive updates with upsert pattern
+- Cleans up old synced records via weekly cron
+
+See [source-module/README.md](source-module/README.md) for full documentation.
+
+### Database User Permissions
+
+The DataSync user needs read access to sync data and write access to mark records as synced:
 
 ```sql
--- See sql/datasync_setup/install-1.0.0.php for full schema
-CREATE TABLE datasync_change_tracker (
-    tracker_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    entity_type VARCHAR(50) NOT NULL,
-    entity_id INT UNSIGNED NOT NULL,
-    action ENUM('create', 'update', 'delete') NOT NULL,
-    created_at DATETIME NOT NULL,
-    sync_completed TINYINT(1) DEFAULT 0,
-    synced_at DATETIME DEFAULT NULL,
-    INDEX idx_pending (sync_completed, entity_type),
-    INDEX idx_entity (entity_type, entity_id)
-);
+-- Read access for syncing
+GRANT SELECT ON source_database.* TO 'datasync_user'@'%';
+
+-- Write access to mark tracker records as synced
+GRANT UPDATE, DELETE ON source_database.datasync_change_tracker TO 'datasync_user'@'%';
 ```
 
 ## CLI Commands

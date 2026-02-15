@@ -1,0 +1,163 @@
+<?xml version="1.0"?>
+<!--
+    Maho DataSync Tracker - Source Module
+
+    This module tracks entity changes using Magento events (observers).
+    Changes are logged to the datasync_change_tracker table.
+-->
+<config>
+    <modules>
+        <Maho_DataSyncTracker>
+            <version>1.0.0</version>
+        </Maho_DataSyncTracker>
+    </modules>
+    <global>
+        <models>
+            <maho_datasynctracker>
+                <class>Maho_DataSyncTracker_Model</class>
+            </maho_datasynctracker>
+        </models>
+        <resources>
+            <datasync_tracker_setup>
+                <setup>
+                    <module>Maho_DataSyncTracker</module>
+                </setup>
+            </datasync_tracker_setup>
+        </resources>
+        <events>
+            <!-- Customer -->
+            <customer_save_after>
+                <observers>
+                    <maho_datasynctracker_customer>
+                        <class>maho_datasynctracker/observer</class>
+                        <method>trackCustomer</method>
+                    </maho_datasynctracker_customer>
+                </observers>
+            </customer_save_after>
+            <customer_delete_after>
+                <observers>
+                    <maho_datasynctracker_customer_delete>
+                        <class>maho_datasynctracker/observer</class>
+                        <method>trackCustomerDelete</method>
+                    </maho_datasynctracker_customer_delete>
+                </observers>
+            </customer_delete_after>
+            <customer_address_save_after>
+                <observers>
+                    <maho_datasynctracker_customer_address>
+                        <class>maho_datasynctracker/observer</class>
+                        <method>trackCustomerAddress</method>
+                    </maho_datasynctracker_customer_address>
+                </observers>
+            </customer_address_save_after>
+
+            <!-- Orders -->
+            <sales_order_save_after>
+                <observers>
+                    <maho_datasynctracker_order>
+                        <class>maho_datasynctracker/observer</class>
+                        <method>trackOrder</method>
+                    </maho_datasynctracker_order>
+                </observers>
+            </sales_order_save_after>
+            <sales_order_invoice_save_after>
+                <observers>
+                    <maho_datasynctracker_invoice>
+                        <class>maho_datasynctracker/observer</class>
+                        <method>trackInvoice</method>
+                    </maho_datasynctracker_invoice>
+                </observers>
+            </sales_order_invoice_save_after>
+            <sales_order_shipment_save_after>
+                <observers>
+                    <maho_datasynctracker_shipment>
+                        <class>maho_datasynctracker/observer</class>
+                        <method>trackShipment</method>
+                    </maho_datasynctracker_shipment>
+                </observers>
+            </sales_order_shipment_save_after>
+            <sales_order_creditmemo_save_after>
+                <observers>
+                    <maho_datasynctracker_creditmemo>
+                        <class>maho_datasynctracker/observer</class>
+                        <method>trackCreditmemo</method>
+                    </maho_datasynctracker_creditmemo>
+                </observers>
+            </sales_order_creditmemo_save_after>
+            <sales_order_status_history_save_after>
+                <observers>
+                    <maho_datasynctracker_order_comment>
+                        <class>maho_datasynctracker/observer</class>
+                        <method>trackOrderComment</method>
+                    </maho_datasynctracker_order_comment>
+                </observers>
+            </sales_order_status_history_save_after>
+
+            <!-- Newsletter -->
+            <newsletter_subscriber_save_after>
+                <observers>
+                    <maho_datasynctracker_newsletter>
+                        <class>maho_datasynctracker/observer</class>
+                        <method>trackNewsletter</method>
+                    </maho_datasynctracker_newsletter>
+                </observers>
+            </newsletter_subscriber_save_after>
+
+            <!-- Catalog -->
+            <catalog_product_save_after>
+                <observers>
+                    <maho_datasynctracker_product>
+                        <class>maho_datasynctracker/observer</class>
+                        <method>trackProduct</method>
+                    </maho_datasynctracker_product>
+                </observers>
+            </catalog_product_save_after>
+            <catalog_product_delete_after>
+                <observers>
+                    <maho_datasynctracker_product_delete>
+                        <class>maho_datasynctracker/observer</class>
+                        <method>trackProductDelete</method>
+                    </maho_datasynctracker_product_delete>
+                </observers>
+            </catalog_product_delete_after>
+            <catalog_category_save_after>
+                <observers>
+                    <maho_datasynctracker_category>
+                        <class>maho_datasynctracker/observer</class>
+                        <method>trackCategory</method>
+                    </maho_datasynctracker_category>
+                </observers>
+            </catalog_category_save_after>
+            <catalog_category_delete_after>
+                <observers>
+                    <maho_datasynctracker_category_delete>
+                        <class>maho_datasynctracker/observer</class>
+                        <method>trackCategoryDelete</method>
+                    </maho_datasynctracker_category_delete>
+                </observers>
+            </catalog_category_delete_after>
+
+            <!-- Stock -->
+            <cataloginventory_stock_item_save_after>
+                <observers>
+                    <maho_datasynctracker_stock>
+                        <class>maho_datasynctracker/observer</class>
+                        <method>trackStock</method>
+                    </maho_datasynctracker_stock>
+                </observers>
+            </cataloginventory_stock_item_save_after>
+        </events>
+    </global>
+    <crontab>
+        <jobs>
+            <maho_datasynctracker_cleanup>
+                <schedule>
+                    <cron_expr>0 3 * * 0</cron_expr>
+                </schedule>
+                <run>
+                    <model>maho_datasynctracker/observer::cleanupOldRecords</model>
+                </run>
+            </maho_datasynctracker_cleanup>
+        </jobs>
+    </crontab>
+</config>

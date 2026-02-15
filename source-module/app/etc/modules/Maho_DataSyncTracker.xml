@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<!--
+    Maho DataSync Tracker - Source Module
+
+    Install this module on your SOURCE OpenMage/Magento 1 system.
+    It tracks entity changes for incremental sync to the destination.
+-->
+<config>
+    <modules>
+        <Maho_DataSyncTracker>
+            <active>true</active>
+            <codePool>community</codePool>
+            <depends>
+                <Mage_Customer/>
+                <Mage_Sales/>
+                <Mage_Catalog/>
+                <Mage_Newsletter/>
+                <Mage_CatalogInventory/>
+            </depends>
+        </Maho_DataSyncTracker>
+    </modules>
+</config>
