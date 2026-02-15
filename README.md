@@ -298,6 +298,34 @@ The `doc/examples/` directory contains comprehensive examples:
 - `IMPORT_ORDER.md` - Required import sequence and dependency map
 - `examples/README.md` - Detailed field documentation
 
+## Performance
+
+Sync speed varies by entity type, network latency, and server resources. Approximate throughput with direct database connection:
+
+| Entity | Throughput | Notes |
+|--------|------------|-------|
+| Stock | 500-1000/sec | Direct SQL updates, very efficient |
+| Customers | 50-100/sec | Includes address processing |
+| Products (Simple) | 30-80/sec | Depends on attribute count |
+| Products (Configurable) | 10-30/sec | Includes child product linking |
+| Newsletter | 100-200/sec | Simple table structure |
+| Orders | 10-50/sec | Complex: addresses, items, payment, status history |
+| Invoices | 20-60/sec | Requires parent order lookup |
+| Shipments | 20-60/sec | Includes tracking info |
+| Credit Memos | 20-50/sec | Includes item adjustments |
+
+**Optimization tips:**
+
+- **Use `--stock=exclude`** during initial product sync, then sync stock separately
+- **Batch size**: The incremental command processes entities in batches to balance memory and speed
+- **Network**: Direct database connection is fastest; PHP proxy adds ~20-40% overhead
+- **Indexes**: Ensure source database has proper indexes on `updated_at` columns
+- **Disable indexers**: On destination, disable Maho indexers during large imports
+
+**Incremental vs Full Sync:**
+
+Incremental sync (`datasync:incremental`) is significantly faster for ongoing synchronization because it only processes changed records. For initial migration, use `datasync:sync` with appropriate filters.
+
 ## Roadmap
 
 - [ ] **PHP Proxy adapter** - HTTP API on source system to avoid direct DB connection (firewall-friendly)
