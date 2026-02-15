@@ -300,6 +300,7 @@ The `doc/examples/` directory contains comprehensive examples:
 
 ## Roadmap
 
+- [ ] **PHP Proxy adapter** - HTTP API on source system to avoid direct DB connection (firewall-friendly)
 - [ ] Magento 2 source adapter
 - [ ] Shopify source adapter
 - [ ] WooCommerce source adapter
