@@ -283,6 +283,7 @@ The `--no-lock` option exists but is not recommended. The default flock-based lo
 | Credit Memos | `creditmemo` | ✅ | Requires parent order to be synced first |
 | Customers | `customer` | ✅ | Including addresses |
 | Products | `product` | ✅ | Simple, configurable, bundle, downloadable, virtual |
+| Product Attributes | `productattribute` | ❌ | Attributes with options, assigns to attribute sets |
 | Categories | `category` | ✅ | With full tree structure |
 | Newsletter | `newsletter` | ✅ | Subscriber data |
 | Stock | `stock` | ✅ | Inventory levels |
@@ -291,8 +292,7 @@ The `--no-lock` option exists but is not recommended. The default flock-based lo
 
 | Entity | Status | Notes |
 |--------|--------|-------|
-| Attributes | Planned | Product attributes and options |
-| Attribute Sets | Planned | Attribute set definitions |
+| Attribute Sets | Planned | Standalone attribute set sync (attributes can already be assigned to sets during attribute import) |
 | Customer Groups | Planned | Group definitions |
 | CMS Pages | Planned | Content pages |
 | CMS Blocks | Planned | Static blocks |
@@ -375,7 +375,7 @@ Incremental sync (`datasync:incremental`) is significantly faster for ongoing sy
 ## Roadmap
 
 ### Entity Support
-- [ ] Product Attributes (+ attribute options)
+- [x] Product Attributes (+ attribute options)
 - [ ] Attribute Sets (+ attribute groups)
 - [ ] Customer Groups
 - [ ] CMS Pages
