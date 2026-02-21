@@ -98,11 +98,24 @@
 
             <!-- Registered Entity Handlers -->
             <entities>
+                <!-- CMS content (no foreign key deps on other entities) -->
+                <cms_block>
+                    <class>datasync/entity_cmsBlock</class>
+                    <label>CMS Blocks</label>
+                    <order>5</order>
+                </cms_block>
+                <cms_page>
+                    <class>datasync/entity_cmsPage</class>
+                    <label>CMS Pages</label>
+                    <order>6</order>
+                    <depends>cms_block</depends>
+                </cms_page>
+
                 <!-- Foundation entities (no dependencies) -->
                 <product_attribute>
                     <class>datasync/entity_productAttribute</class>
                     <label>Product Attributes</label>
-                    <order>5</order>
+                    <order>7</order>
                 </product_attribute>
                 <category>
                     <class>datasync/entity_category</class>

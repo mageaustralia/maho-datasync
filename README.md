@@ -4,7 +4,7 @@ Data synchronization module for [Maho](https://github.com/mahocommerce/maho) and
 
 ## Features
 
-- **Full Entity Support**: Orders, invoices, shipments, credit memos, customers, products, categories, newsletter subscribers, and more
+- **Full Entity Support**: Orders, invoices, shipments, credit memos, customers, products, categories, newsletter subscribers, CMS blocks, CMS pages, and more
 - **Incremental Sync**: Track changes via database triggers and sync only what's changed
 - **Batch Processing**: Efficient bulk operations with configurable batch sizes
 - **Foreign Key Resolution**: Automatic mapping of entity relationships between source and destination
@@ -25,13 +25,14 @@ Data synchronization module for [Maho](https://github.com/mahocommerce/maho) and
 Entities must be imported in the correct order due to foreign key dependencies:
 
 ```
-1. Foundation    → Attributes, Attribute Sets, Customer Groups
-2. Structure     → Categories
-3. Catalog       → Simple Products → Configurable/Grouped/Bundle Products
-4. Customers     → Customers (with addresses)
-5. Sales         → Orders → Invoices → Shipments → Credit Memos
-6. Marketing     → Newsletter Subscribers
-7. Inventory     → Stock Updates
+1. CMS Content   → CMS Blocks → CMS Pages
+2. Foundation    → Attributes, Attribute Sets, Customer Groups
+3. Structure     → Categories
+4. Catalog       → Simple Products → Configurable/Grouped/Bundle Products
+5. Customers     → Customers (with addresses)
+6. Sales         → Orders → Invoices → Shipments → Credit Memos
+7. Marketing     → Newsletter Subscribers
+8. Inventory     → Stock Updates
 ```
 
 See [doc/IMPORT_ORDER.md](app/code/core/Maho/DataSync/doc/IMPORT_ORDER.md) for detailed dependency documentation.
@@ -138,7 +139,7 @@ Sync all entities of a specific type from a source system.
 **Required Arguments:**
 | Argument | Description |
 |----------|-------------|
-| `entity` | Entity type: `product`, `customer`, `category`, `order`, `invoice`, `shipment`, `creditmemo`, `productattribute` |
+| `entity` | Entity type: `product`, `customer`, `category`, `order`, `invoice`, `shipment`, `creditmemo`, `productattribute`, `cms_block`, `cms_page` |
 | `source` | Source system identifier (e.g., "legacy", "woocommerce", "csv") |
 
 **Source Options:**
@@ -277,6 +278,8 @@ The `--no-lock` option exists but is not recommended. The default flock-based lo
 
 | Entity | Type Key | Incremental | Notes |
 |--------|----------|-------------|-------|
+| CMS Blocks | `cms_block` | ✅ | Static blocks with store associations |
+| CMS Pages | `cms_page` | ✅ | Content pages with store associations |
 | Orders | `order` | ✅ | Full order data including addresses, items, payment |
 | Invoices | `invoice` | ✅ | Requires parent order to be synced first |
 | Shipments | `shipment` | ✅ | Requires parent order to be synced first |
@@ -294,8 +297,6 @@ The `--no-lock` option exists but is not recommended. The default flock-based lo
 |--------|--------|-------|
 | Attribute Sets | Planned | Standalone attribute set sync (attributes can already be assigned to sets during attribute import) |
 | Customer Groups | Planned | Group definitions |
-| CMS Pages | Planned | Content pages |
-| CMS Blocks | Planned | Static blocks |
 | Reviews & Ratings | Planned | Product reviews |
 | Cart Price Rules | Planned | Promotions and coupons |
 | URL Rewrites | Not planned | Can be massive; regenerate on destination instead |
@@ -350,6 +351,8 @@ Sync speed varies by entity type, network latency, and server resources. Approxi
 
 | Entity | Throughput | Notes |
 |--------|------------|-------|
+| CMS Blocks | 200-400/sec | Simple flat table with store associations |
+| CMS Pages | 200-400/sec | Simple flat table with store associations |
 | Stock | 500-1000/sec | Direct SQL updates, very efficient |
 | Customers | 50-100/sec | Includes address processing |
 | Products (Simple) | 30-80/sec | Depends on attribute count |
@@ -376,10 +379,10 @@ Incremental sync (`datasync:incremental`) is significantly faster for ongoing sy
 
 ### Entity Support
 - [x] Product Attributes (+ attribute options)
+- [x] CMS Blocks (with store associations)
+- [x] CMS Pages (with store associations)
 - [ ] Attribute Sets (+ attribute groups)
 - [ ] Customer Groups
-- [ ] CMS Pages
-- [ ] CMS Blocks
 - [ ] Reviews & Ratings
 - [ ] Cart Price Rules (+ coupons)
 

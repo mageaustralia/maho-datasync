@@ -98,6 +98,18 @@ class Maho_DataSync_Model_Adapter_OpenMage extends Maho_DataSync_Model_Adapter_A
             'date_field' => 'change_status_at',
             'eav' => false,
         ],
+        'cms_block' => [
+            'entity_table' => 'cms_block',
+            'id_field' => 'block_id',
+            'date_field' => 'update_time',
+            'eav' => false,
+        ],
+        'cms_page' => [
+            'entity_table' => 'cms_page',
+            'id_field' => 'page_id',
+            'date_field' => 'update_time',
+            'eav' => false,
+        ],
     ];
 
     /**
@@ -336,6 +348,10 @@ class Maho_DataSync_Model_Adapter_OpenMage extends Maho_DataSync_Model_Adapter_A
                     $row = $this->_enrichCreditmemoData($row);
                 } elseif ($entityType === 'product_attribute') {
                     $row = $this->_enrichAttributeData($row);
+                } elseif ($entityType === 'cms_block') {
+                    $row = $this->_enrichCmsBlockData($row);
+                } elseif ($entityType === 'cms_page') {
+                    $row = $this->_enrichCmsPageData($row);
                 }
 
                 yield $row;
@@ -1394,6 +1410,46 @@ class Maho_DataSync_Model_Adapter_OpenMage extends Maho_DataSync_Model_Adapter_A
             }
         } catch (PDOException $e) {
             // Continue
+        }
+
+        return $row;
+    }
+
+    /**
+     * Enrich CMS block data with store associations
+     */
+    protected function _enrichCmsBlockData(array $row): array
+    {
+        $storeTable = $this->_tablePrefix . 'cms_block_store';
+
+        try {
+            $stmt = $this->_connection->prepare(
+                "SELECT store_id FROM {$storeTable} WHERE block_id = :block_id",
+            );
+            $stmt->execute(['block_id' => $row['block_id']]);
+            $row['store_ids'] = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        } catch (PDOException $e) {
+            $row['store_ids'] = [0];
+        }
+
+        return $row;
+    }
+
+    /**
+     * Enrich CMS page data with store associations
+     */
+    protected function _enrichCmsPageData(array $row): array
+    {
+        $storeTable = $this->_tablePrefix . 'cms_page_store';
+
+        try {
+            $stmt = $this->_connection->prepare(
+                "SELECT store_id FROM {$storeTable} WHERE page_id = :page_id",
+            );
+            $stmt->execute(['page_id' => $row['page_id']]);
+            $row['store_ids'] = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        } catch (PDOException $e) {
+            $row['store_ids'] = [0];
         }
 
         return $row;
