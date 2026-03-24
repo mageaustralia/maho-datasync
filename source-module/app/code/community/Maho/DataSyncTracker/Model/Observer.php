@@ -195,6 +195,21 @@ class Maho_DataSyncTracker_Model_Observer
     }
 
     /**
+     * Track bulk attribute update (admin mass action: Update Attributes)
+     * This event fires from Mage_Catalog_Model_Product_Action::updateAttributes()
+     * which bypasses the normal catalog_product_save_after event.
+     */
+    public function trackProductAttributeUpdate(Varien_Event_Observer $observer)
+    {
+        $productIds = $observer->getProductIds();
+        if (is_array($productIds)) {
+            foreach ($productIds as $productId) {
+                $this->_track('product', $productId, 'update');
+            }
+        }
+    }
+
+    /**
      * Track stock item save
      */
     public function trackStock(Varien_Event_Observer $observer)

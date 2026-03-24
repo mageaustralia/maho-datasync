@@ -399,9 +399,11 @@ class Maho_DataSync_Model_Entity_Invoice extends Maho_DataSync_Model_Entity_Abst
             $invoiceItem->setSku($orderItem->getSku());
             $invoiceItem->setName($orderItem->getName());
 
-            // Quantity
+            // Quantity - use setData to bypass qty validation since the order sync
+            // may have already updated qty_invoiced on the order item before the
+            // invoice record is created (timing gap in incremental sync)
             $qty = (float) ($itemData['qty'] ?? $orderItem->getQtyOrdered());
-            $invoiceItem->setQty($qty);
+            $invoiceItem->setData('qty', $qty);
 
             // Prices (from order item or override)
             $invoiceItem->setPrice((float) ($itemData['price'] ?? $orderItem->getPrice()));
@@ -435,10 +437,15 @@ class Maho_DataSync_Model_Entity_Invoice extends Maho_DataSync_Model_Entity_Abst
         Mage_Sales_Model_Order $order,
     ): void {
         foreach ($order->getAllItems() as $orderItem) {
-            // Skip already fully invoiced items
+            // For DataSync imports, the order sync may have already set qty_invoiced
+            // from the source system before the invoice record is created. Use
+            // qty_ordered as fallback when qty_to_invoice shows 0.
             $qtyToInvoice = $orderItem->getQtyOrdered() - $orderItem->getQtyInvoiced();
             if ($qtyToInvoice <= 0) {
-                continue;
+                $qtyToInvoice = $orderItem->getQtyOrdered();
+                if ($qtyToInvoice <= 0) {
+                    continue;
+                }
             }
 
             /** @var Mage_Sales_Model_Order_Invoice_Item $invoiceItem */
@@ -452,7 +459,7 @@ class Maho_DataSync_Model_Entity_Invoice extends Maho_DataSync_Model_Entity_Abst
             $invoiceItem->setSku($orderItem->getSku());
             $invoiceItem->setName($orderItem->getName());
 
-            $invoiceItem->setQty($qtyToInvoice);
+            $invoiceItem->setData('qty', $qtyToInvoice);
             $invoiceItem->setPrice($orderItem->getPrice());
             $invoiceItem->setBasePrice($orderItem->getBasePrice());
 

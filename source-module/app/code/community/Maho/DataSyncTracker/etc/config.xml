@@ -112,6 +112,14 @@
                     </maho_datasynctracker_product>
                 </observers>
             </catalog_product_save_after>
+            <catalog_product_attribute_update_before>
+                <observers>
+                    <maho_datasynctracker_product_attribute_update>
+                        <class>maho_datasynctracker/observer</class>
+                        <method>trackProductAttributeUpdate</method>
+                    </maho_datasynctracker_product_attribute_update>
+                </observers>
+            </catalog_product_attribute_update_before>
             <catalog_product_delete_after>
                 <observers>
                     <maho_datasynctracker_product_delete>
