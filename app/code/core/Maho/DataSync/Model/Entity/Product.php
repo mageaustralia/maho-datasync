@@ -817,7 +817,7 @@ class Maho_DataSync_Model_Entity_Product extends Maho_DataSync_Model_Entity_Abst
             'min_qty', 'max_qty', 'min_sale_qty', 'max_sale_qty', 'backorders',
             'notify_stock_qty', 'tier_prices', 'group_prices', 'store_id',
             '_source_system', '_existing_id', '_external_ref', '_entity_options',
-            'image', 'small_image', 'thumbnail', 'media_gallery', 'images',
+            'media_gallery', 'images',
             'custom_options', 'configurable_attributes', 'configurable_children_skus',
             'configurable_parent_sku', 'grouped_products', 'bundle_options',
         ]);
