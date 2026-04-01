@@ -925,14 +925,16 @@ class Maho_DataSync_Model_Entity_Product extends Maho_DataSync_Model_Entity_Abst
             $this->_addTiming('group_prices', microtime(true) - $t0);
         }
 
-        // Handle images - skip during fast-update unless explicitly requested
-        // During incremental sync, image EAV values (image, small_image, thumbnail) are
-        // always present in source data even if unchanged. Re-processing them adds ~750ms
-        // per product for file-exists checks + gallery re-add + a full $product->save().
+        // Handle images during fast-update
+        // Full _importImages (~750ms) is skipped unless explicitly requested.
+        // However, we always run a lightweight gallery sync to add any new gallery
+        // entries from the source — without downloading files or a full product save.
         $t0 = microtime(true);
         $skipImages = $data['_entity_options']['skip_images_on_update'] ?? true;
         if (!$skipImages) {
             $this->_importImages($product, $data);
+        } elseif (!empty($data['images'])) {
+            $this->_syncGalleryEntries($productId, $data['images']);
         }
         $this->_addTiming('images', microtime(true) - $t0);
 
@@ -955,6 +957,83 @@ class Maho_DataSync_Model_Entity_Product extends Maho_DataSync_Model_Entity_Abst
         $this->_log("Fast-updated product #{$productId}");
 
         return $productId;
+    }
+
+    /**
+     * Sync gallery entries: add any images from source that aren't in the local gallery.
+     *
+     * Lightweight alternative to _importImages during incremental updates —
+     * no file downloads, no product save. Just DB record insertion for new entries.
+     *
+     * @param array $sourceImages Array of image records from adapter: [['file' => ..., 'position' => ..., 'disabled' => ...], ...]
+     */
+    protected function _syncGalleryEntries(int $productId, array $sourceImages): void
+    {
+        $resource = Mage::getSingleton('core/resource');
+        $read = $resource->getConnection('core_read');
+        $write = $resource->getConnection('core_write');
+        $galleryTable = $resource->getTableName('catalog_product_entity_media_gallery');
+        $galleryValueTable = $resource->getTableName('catalog_product_entity_media_gallery_value');
+
+        // Get attribute_id for media_gallery
+        static $mediaGalleryAttrId = null;
+        if ($mediaGalleryAttrId === null) {
+            $mediaGalleryAttrId = (int) $read->fetchOne(
+                "SELECT attribute_id FROM eav_attribute WHERE attribute_code = 'media_gallery' AND entity_type_id = (SELECT entity_type_id FROM eav_entity_type WHERE entity_type_code = 'catalog_product')",
+            );
+        }
+
+        if (!$mediaGalleryAttrId) {
+            return;
+        }
+
+        // Get existing gallery file paths for this product
+        $existing = $read->fetchCol(
+            "SELECT value FROM {$galleryTable} WHERE entity_id = ?",
+            [$productId],
+        );
+        $existingSet = array_flip($existing);
+
+        foreach ($sourceImages as $img) {
+            $file = $img['file'] ?? null;
+            if (!$file) {
+                continue;
+            }
+
+            // Normalize path
+            $file = '/' . ltrim($file, '/');
+
+            // Skip if already in gallery
+            if (isset($existingSet[$file])) {
+                continue;
+            }
+
+            // Check if file exists on local filesystem
+            $mediaDir = Mage::getBaseDir('media') . DS . 'catalog' . DS . 'product';
+            $localFile = $mediaDir . str_replace('/', DS, $file);
+            if (!file_exists($localFile)) {
+                continue;
+            }
+
+            // Insert gallery entry
+            $write->insert($galleryTable, [
+                'attribute_id' => $mediaGalleryAttrId,
+                'entity_id'    => $productId,
+                'value'        => $file,
+            ]);
+            $valueId = (int) $write->lastInsertId($galleryTable);
+
+            // Insert gallery value (store 0 = default)
+            $write->insert($galleryValueTable, [
+                'value_id' => $valueId,
+                'store_id' => 0,
+                'label'    => $img['label'] ?? null,
+                'position' => (int) ($img['position'] ?? 0),
+                'disabled' => (int) ($img['disabled'] ?? 0),
+            ]);
+
+            $this->_log("Added gallery image to product #{$productId}: {$file}");
+        }
     }
 
     /**
