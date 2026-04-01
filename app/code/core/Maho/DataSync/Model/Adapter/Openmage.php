@@ -17,7 +17,7 @@ declare(strict_types=1);
  * Properly handles EAV entities (products, categories, customers)
  * and flat tables (orders, invoices, shipments, credit memos).
  */
-class Maho_DataSync_Model_Adapter_OpenMage extends Maho_DataSync_Model_Adapter_Abstract
+class Maho_DataSync_Model_Adapter_Openmage extends Maho_DataSync_Model_Adapter_Abstract
 {
     protected ?PDO $_connection = null;
     protected string $_tablePrefix = '';

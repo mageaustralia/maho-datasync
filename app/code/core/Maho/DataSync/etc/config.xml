@@ -75,7 +75,7 @@
                     <description>Import from CSV files</description>
                 </csv>
                 <openmage>
-                    <class>datasync/adapter_openMage</class>
+                    <class>datasync/adapter_openmage</class>
                     <label>OpenMage Database</label>
                     <description>Direct database connection to OpenMage/Magento 1</description>
                 </openmage>
