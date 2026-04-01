@@ -337,6 +337,11 @@ class Maho_DataSync_Model_Adapter_Openmage extends Maho_DataSync_Model_Adapter_A
             $stmt->execute();
 
             while ($row = $stmt->fetch()) {
+                // Normalize id field to entity_id so engine can track source IDs
+                if (!isset($row['entity_id']) && isset($row[$idField])) {
+                    $row['entity_id'] = $row[$idField];
+                }
+
                 // Add related data for orders
                 if ($entityType === 'order') {
                     $row = $this->_enrichOrderData($row);
