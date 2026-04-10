@@ -315,6 +315,29 @@ class Maho_DataSync_Model_Entity_Category extends Maho_DataSync_Model_Entity_Abs
             $category->setCustomLayoutUpdate($data['custom_layout_update']);
         }
 
+        // Set any additional EAV attributes not explicitly handled above
+        $skipFields = [
+            'entity_id', 'entity_type_id', 'attribute_set_id', 'parent_id',
+            'created_at', 'updated_at', 'path', 'level', 'children_count',
+            'name', 'is_active', 'include_in_menu', 'url_key', 'position',
+            'description', 'meta_title', 'meta_keywords', 'meta_description',
+            'display_mode', 'landing_page', 'is_anchor',
+            'available_sort_by', 'default_sort_by',
+            'custom_design', 'page_layout', 'custom_layout_update',
+            'store_id', '_source_system', '_existing_id', '_external_ref',
+            '_entity_options', '_adapter', '_on_duplicate', '_action',
+            'website_ids', 'category_ids',
+        ];
+        $categoryAttributes = $category->getAttributes();
+        foreach ($data as $key => $value) {
+            if (in_array($key, $skipFields) || str_starts_with($key, '_')) {
+                continue;
+            }
+            if (isset($categoryAttributes[$key]) && $value !== null) {
+                $category->setData($key, $value);
+            }
+        }
+
         // Handle parent change (moves category in tree)
         if (!empty($data['parent_id']) && $data['parent_id'] != $category->getParentId()) {
             $newParentId = $this->_resolveParentId($data);
