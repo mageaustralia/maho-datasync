@@ -1259,18 +1259,32 @@ class Maho_DataSync_Model_Entity_Product extends Maho_DataSync_Model_Entity_Abst
             return;
         }
 
-        $formattedPrices = [];
-        foreach ($tierPrices as $tier) {
-            $formattedPrices[] = [
-                'website_id' => $tier['website_id'] ?? 0,
-                'cust_group' => $tier['cust_group'] ?? $tier['customer_group'] ?? Mage_Customer_Model_Group::CUST_GROUP_ALL,
-                'price_qty' => $tier['qty'] ?? $tier['price_qty'] ?? 1,
-                'price' => $tier['price'] ?? 0,
-            ];
-        }
+        $productId = (int) $product->getId();
+        $resource = Mage::getSingleton('core/resource');
+        $write = $resource->getConnection('core_write');
+        $table = $resource->getTableName('catalog/product') . '_tier_price';
 
-        $product->setTierPrice($formattedPrices);
-        $product->save();
+        // Delete existing native tier prices for this product
+        $write->delete($table, "entity_id = {$productId}");
+
+        // Insert new ones with the correct local entity_id
+        foreach ($tierPrices as $tier) {
+            try {
+                $write->insert($table, [
+                    'entity_id'         => $productId,
+                    'all_groups'        => ($tier['cust_group'] ?? $tier['customer_group_id'] ?? 0) == Mage_Customer_Model_Group::CUST_GROUP_ALL ? 1 : 0,
+                    'customer_group_id' => $tier['cust_group'] ?? $tier['customer_group_id'] ?? 0,
+                    'qty'               => $tier['qty'] ?? $tier['price_qty'] ?? 1,
+                    'value'             => $tier['value'] ?? $tier['price'] ?? 0,
+                    'website_id'        => $tier['website_id'] ?? 0,
+                ]);
+            } catch (Exception $e) {
+                $this->_log(
+                    "Failed to insert tier price for product #{$productId}: " . $e->getMessage(),
+                    Maho_DataSync_Helper_Data::LOG_LEVEL_WARNING,
+                );
+            }
+        }
     }
 
     /**
