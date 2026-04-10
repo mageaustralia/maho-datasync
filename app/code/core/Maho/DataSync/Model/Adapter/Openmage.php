@@ -593,6 +593,13 @@ class Maho_DataSync_Model_Adapter_Openmage extends Maho_DataSync_Model_Adapter_A
         if (($row['type_id'] ?? '') === 'configurable') {
             $row['configurable_attributes'] = $this->_loadConfigurableAttributes($entityId);
             $row['configurable_children_skus'] = $this->_loadConfigurableChildren($entityId);
+        } elseif (($row['type_id'] ?? '') === 'simple') {
+            // Check if this simple product is a child of a configurable
+            // This enables Mode 2 linking when only children are in the sync batch
+            $parentSku = $this->_loadConfigurableParentSku($entityId);
+            if ($parentSku !== null) {
+                $row['configurable_parent_sku'] = $parentSku;
+            }
         }
 
         // Load grouped product links
@@ -806,6 +813,33 @@ class Maho_DataSync_Model_Adapter_Openmage extends Maho_DataSync_Model_Adapter_A
             return array_column($stmt->fetchAll(), 'sku');
         } catch (PDOException $e) {
             return [];
+        }
+    }
+
+    /**
+     * Load the parent configurable SKU for a simple product (if any)
+     *
+     * Enables Mode 2 linking (configurable_parent_sku on child row) so that
+     * incremental syncs that only process children can still establish links.
+     */
+    protected function _loadConfigurableParentSku(int $entityId): ?string
+    {
+        $linkTable = $this->_tablePrefix . 'catalog_product_super_link';
+        $productTable = $this->_tablePrefix . 'catalog_product_entity';
+
+        $sql = "SELECT p.sku
+                FROM {$linkTable} sl
+                JOIN {$productTable} p ON sl.parent_id = p.entity_id
+                WHERE sl.product_id = :child_id
+                LIMIT 1";
+
+        try {
+            $stmt = $this->_connection->prepare($sql);
+            $stmt->execute(['child_id' => $entityId]);
+            $result = $stmt->fetchColumn();
+            return $result !== false ? (string) $result : null;
+        } catch (PDOException $e) {
+            return null;
         }
     }
 

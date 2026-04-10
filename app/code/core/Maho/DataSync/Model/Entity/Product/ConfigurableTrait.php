@@ -401,11 +401,22 @@ trait Maho_DataSync_Model_Entity_Product_ConfigurableTrait
             $attribute = Mage::getSingleton('eav/config')
                 ->getAttribute('catalog_product', $code);
 
-            if ($attribute instanceof Mage_Eav_Model_Entity_Attribute_Abstract
-                && $attribute->getId()
-                && $attribute->getIsConfigurable()) {
-                $ids[] = $attribute->getId();
+            if (!($attribute instanceof Mage_Eav_Model_Entity_Attribute_Abstract) || !$attribute->getId()) {
+                $this->_log(
+                    "Super attribute '{$code}' not found in catalog_product entity",
+                    Maho_DataSync_Helper_Data::LOG_LEVEL_WARNING,
+                );
+                continue;
             }
+            if (!$attribute->getIsConfigurable()) {
+                $this->_log(
+                    "Attribute '{$code}' (ID:{$attribute->getId()}) has is_configurable=0 — cannot use as super attribute. "
+                    . 'Re-run datasync:sync product_attribute with --on-duplicate update to fix.',
+                    Maho_DataSync_Helper_Data::LOG_LEVEL_WARNING,
+                );
+                continue;
+            }
+            $ids[] = $attribute->getId();
         }
         return $ids;
     }

@@ -887,9 +887,11 @@ class Maho_DataSync_Model_Entity_Order extends Maho_DataSync_Model_Entity_Abstra
             /** @var Mage_Sales_Model_Order_Item $item */
             $item = Mage::getModel('sales/order_item');
 
-            // Product info
-            $item->setProductId($itemData['product_id'] ?? null);
-            $item->setSku($this->_cleanString($itemData['sku'] ?? ''));
+            // Product info — resolve local product_id by SKU (source IDs don't match target)
+            $sku = $this->_cleanString($itemData['sku'] ?? '');
+            $localProductId = $this->_resolveLocalProductId($sku, $itemData['product_id'] ?? null);
+            $item->setProductId($localProductId);
+            $item->setSku($sku);
             $item->setName($this->_cleanString($itemData['name'] ?? $itemData['sku'] ?? ''));
             $item->setProductType($itemData['product_type'] ?? 'simple');
 
@@ -1167,6 +1169,39 @@ class Maho_DataSync_Model_Entity_Order extends Maho_DataSync_Model_Entity_Abstra
      * Tries to instantiate the payment method to verify it exists.
      * Results are cached for performance during bulk imports.
      */
+    /**
+     * SKU-to-product-ID cache for order item import
+     */
+    protected static array $_skuProductIdCache = [];
+
+    /**
+     * Resolve local product_id by SKU, falling back to source product_id
+     *
+     * Source order items carry the source system's product_id which won't match
+     * the target catalog. Look up by SKU to get the correct local ID.
+     */
+    protected function _resolveLocalProductId(string $sku, ?int $sourceProductId): ?int
+    {
+        if ($sku === '') {
+            return $sourceProductId;
+        }
+
+        if (isset(self::$_skuProductIdCache[$sku])) {
+            return self::$_skuProductIdCache[$sku];
+        }
+
+        $resource = Mage::getSingleton('core/resource');
+        $read = $resource->getConnection('core_read');
+        $localId = $read->fetchOne(
+            "SELECT entity_id FROM {$resource->getTableName('catalog/product')} WHERE sku = ?",
+            [$sku],
+        );
+
+        $result = $localId ? (int) $localId : $sourceProductId;
+        self::$_skuProductIdCache[$sku] = $result;
+        return $result;
+    }
+
     protected function _isValidPaymentMethod(string $method): bool
     {
         if (isset(self::$_validPaymentMethodsCache[$method])) {
@@ -1410,8 +1445,9 @@ class Maho_DataSync_Model_Entity_Order extends Maho_DataSync_Model_Entity_Abstra
                     $item->setOrderItemId($orderItem->getId());
                 }
 
-                $item->setProductId($itemData['product_id'] ?? ($orderItem ? $orderItem->getProductId() : null));
-                $item->setSku($itemData['sku'] ?? '');
+                $invoiceSku = $itemData['sku'] ?? '';
+                $item->setProductId($this->_resolveLocalProductId($invoiceSku, $itemData['product_id'] ?? ($orderItem ? $orderItem->getProductId() : null)));
+                $item->setSku($invoiceSku);
                 $item->setName($itemData['name'] ?? ($orderItem ? $orderItem->getName() : ''));
                 $item->setQty((float) ($itemData['qty'] ?? 1));
                 $item->setPrice((float) ($itemData['price'] ?? 0));
@@ -1597,8 +1633,9 @@ class Maho_DataSync_Model_Entity_Order extends Maho_DataSync_Model_Entity_Abstra
                     $item->setOrderItemId($orderItem->getId());
                 }
 
-                $item->setProductId($itemData['product_id'] ?? ($orderItem ? $orderItem->getProductId() : null));
-                $item->setSku($itemData['sku'] ?? '');
+                $shipSku = $itemData['sku'] ?? '';
+                $item->setProductId($this->_resolveLocalProductId($shipSku, $itemData['product_id'] ?? ($orderItem ? $orderItem->getProductId() : null)));
+                $item->setSku($shipSku);
                 $item->setName($itemData['name'] ?? ($orderItem ? $orderItem->getName() : ''));
                 $item->setQty((float) ($itemData['qty'] ?? 1));
                 $item->setPrice((float) ($itemData['price'] ?? 0));

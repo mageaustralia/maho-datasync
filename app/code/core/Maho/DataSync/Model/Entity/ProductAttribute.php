@@ -167,6 +167,9 @@ class Maho_DataSync_Model_Entity_ProductAttribute extends Maho_DataSync_Model_En
         $attribute->setUsedForSortBy((int) ($data['used_for_sort_by'] ?? 0));
         $attribute->setIsVisibleInAdvancedSearch((int) ($data['is_visible_in_advanced_search'] ?? 0));
 
+        // Configurable flag (required for super attributes in configurable products)
+        $attribute->setIsConfigurable((int) ($data['is_configurable'] ?? 0));
+
         // Required flag
         $attribute->setIsRequired((int) ($data['is_required'] ?? 0));
 
@@ -273,6 +276,9 @@ class Maho_DataSync_Model_Entity_ProductAttribute extends Maho_DataSync_Model_En
         }
         if (isset($data['position'])) {
             $attribute->setPosition((int) $data['position']);
+        }
+        if (isset($data['is_configurable'])) {
+            $attribute->setIsConfigurable((int) $data['is_configurable']);
         }
 
         try {
@@ -555,6 +561,7 @@ class Maho_DataSync_Model_Entity_ProductAttribute extends Maho_DataSync_Model_En
             'is_filterable' => $attribute->getIsFilterable(),
             'is_comparable' => $attribute->getIsComparable(),
             'is_visible_on_front' => $attribute->getIsVisibleOnFront(),
+            'is_configurable' => $attribute->getIsConfigurable(),
             'is_required' => $attribute->getIsRequired(),
             'is_unique' => $attribute->getIsUnique(),
             'default_value' => $attribute->getDefaultValue(),
