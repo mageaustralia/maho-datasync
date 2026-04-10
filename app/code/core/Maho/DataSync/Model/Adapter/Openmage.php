@@ -1297,18 +1297,23 @@ class Maho_DataSync_Model_Adapter_Openmage extends Maho_DataSync_Model_Adapter_A
      */
     protected function _enrichCategoryData(array $row): array
     {
-        // Path is already in entity table
-        // Add product count
         $categoryId = $row['entity_id'];
         $table = $this->_tablePrefix . 'catalog_category_product';
+        $productTable = $this->_tablePrefix . 'catalog_product_entity';
 
+        // Load product assignments with positions, mapped by SKU for cross-instance compatibility
         try {
             $stmt = $this->_connection->prepare(
-                "SELECT COUNT(*) FROM {$table} WHERE category_id = :category_id",
+                "SELECT p.sku, cp.position FROM {$table} cp
+                 JOIN {$productTable} p ON cp.product_id = p.entity_id
+                 WHERE cp.category_id = :category_id
+                 ORDER BY cp.position ASC",
             );
             $stmt->execute(['category_id' => $categoryId]);
-            $row['product_count'] = (int) $stmt->fetchColumn();
+            $row['category_products'] = $stmt->fetchAll();
+            $row['product_count'] = count($row['category_products']);
         } catch (PDOException $e) {
+            $row['category_products'] = [];
             $row['product_count'] = 0;
         }
 

@@ -374,11 +374,102 @@ class Maho_DataSync_Model_Entity_Category extends Maho_DataSync_Model_Entity_Abs
             $this->_importCategoryImage($category, $data['image']);
         }
 
+        // Sync product assignments and positions (opt-in via entity option)
+        $syncProducts = $data['_entity_options']['sync_category_products'] ?? true;
+        if ($syncProducts && !empty($data['category_products'])) {
+            $this->_syncCategoryProducts($categoryId, $data['category_products']);
+        }
+
         $data['_external_ref'] = $category->getUrlKey();
 
         $this->_log("Updated category #{$categoryId}");
 
         return $categoryId;
+    }
+
+    /**
+     * Sync product assignments and positions for a category.
+     *
+     * Maps source product SKUs to local product IDs and replaces the
+     * catalog_category_product entries for this category.
+     *
+     * @param array $sourceProducts Array of ['sku' => string, 'position' => int]
+     */
+    protected function _syncCategoryProducts(int $categoryId, array $sourceProducts): void
+    {
+        $resource = Mage::getSingleton('core/resource');
+        $read = $resource->getConnection('core_read');
+        $write = $resource->getConnection('core_write');
+        $table = $resource->getTableName('catalog/category_product');
+        $productTable = $resource->getTableName('catalog/product');
+
+        // Build SKU → local product_id map (batch lookup)
+        $skus = array_column($sourceProducts, 'sku');
+        if (empty($skus)) {
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($skus), '?'));
+        $localProducts = $read->fetchPairs(
+            "SELECT sku, entity_id FROM {$productTable} WHERE sku IN ({$placeholders})",
+            $skus,
+        );
+
+        // Build desired state: product_id → position
+        $desired = [];
+        foreach ($sourceProducts as $sp) {
+            $localId = $localProducts[$sp['sku']] ?? null;
+            if ($localId) {
+                $desired[(int) $localId] = (int) ($sp['position'] ?? 0);
+            }
+        }
+
+        // Get current state
+        $current = $read->fetchPairs(
+            "SELECT product_id, position FROM {$table} WHERE category_id = ?",
+            [$categoryId],
+        );
+
+        // Calculate diff
+        $toAdd = array_diff_key($desired, $current);
+        $toRemove = array_diff_key($current, $desired);
+        $toUpdate = [];
+        foreach ($desired as $pid => $pos) {
+            if (isset($current[$pid]) && (int) $current[$pid] !== $pos) {
+                $toUpdate[$pid] = $pos;
+            }
+        }
+
+        // Apply changes
+        foreach ($toAdd as $pid => $pos) {
+            try {
+                $write->insert($table, [
+                    'category_id' => $categoryId,
+                    'product_id' => $pid,
+                    'position' => $pos,
+                ]);
+            } catch (Exception $e) {
+                // Ignore duplicates
+            }
+        }
+
+        foreach ($toUpdate as $pid => $pos) {
+            $write->update($table, ['position' => $pos],
+                "category_id = {$categoryId} AND product_id = {$pid}");
+        }
+
+        if (!empty($toRemove)) {
+            $removeIds = implode(',', array_map('intval', array_keys($toRemove)));
+            $write->delete($table,
+                "category_id = {$categoryId} AND product_id IN ({$removeIds})");
+        }
+
+        $added = count($toAdd);
+        $updated = count($toUpdate);
+        $removed = count($toRemove);
+        if ($added || $updated || $removed) {
+            $this->_log("Category #{$categoryId} products: +{$added} ~{$updated} -{$removed}");
+        }
     }
 
     /**
