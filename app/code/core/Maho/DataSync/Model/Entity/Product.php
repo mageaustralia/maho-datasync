@@ -861,9 +861,7 @@ class Maho_DataSync_Model_Entity_Product extends Maho_DataSync_Model_Entity_Abst
                 if (in_array($frontendInput, ['select', 'multiselect']) && !empty($value) && !is_numeric($value)) {
                     $value = $this->_resolveOptionValue($attribute, $value);
                 }
-                if ($value !== null && $value !== '') {
-                    $attrData[$key] = $value;
-                }
+                $attrData[$key] = $value;
             }
         }
         $this->_addTiming('custom_attributes', microtime(true) - $t0);
