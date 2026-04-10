@@ -267,8 +267,8 @@ class Maho_DataSync_Model_Entity_Category extends Maho_DataSync_Model_Entity_Abs
         }
 
         // Update content
-        if (isset($data['description'])) {
-            $category->setDescription($data['description']);
+        if (array_key_exists('description', $data)) {
+            $category->setDescription($data['description'] ?? '');
         }
 
         // Update SEO
@@ -333,7 +333,7 @@ class Maho_DataSync_Model_Entity_Category extends Maho_DataSync_Model_Entity_Abs
             if (in_array($key, $skipFields) || str_starts_with($key, '_')) {
                 continue;
             }
-            if (isset($categoryAttributes[$key]) && $value !== null) {
+            if (isset($categoryAttributes[$key])) {
                 $category->setData($key, $value);
             }
         }
