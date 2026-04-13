@@ -454,14 +454,19 @@ class Maho_DataSync_Model_Entity_Category extends Maho_DataSync_Model_Entity_Abs
         }
 
         foreach ($toUpdate as $pid => $pos) {
-            $write->update($table, ['position' => $pos],
-                "category_id = {$categoryId} AND product_id = {$pid}");
+            $write->update(
+                $table,
+                ['position' => $pos],
+                "category_id = {$categoryId} AND product_id = {$pid}",
+            );
         }
 
         if (!empty($toRemove)) {
             $removeIds = implode(',', array_map('intval', array_keys($toRemove)));
-            $write->delete($table,
-                "category_id = {$categoryId} AND product_id IN ({$removeIds})");
+            $write->delete(
+                $table,
+                "category_id = {$categoryId} AND product_id IN ({$removeIds})",
+            );
         }
 
         $added = count($toAdd);
