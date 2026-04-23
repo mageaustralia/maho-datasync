@@ -1,5 +1,8 @@
 # Maho DataSync
 
+[![CI](https://github.com/mageaustralia/maho-datasync/actions/workflows/ci.yml/badge.svg)](https://github.com/mageaustralia/maho-datasync/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Data synchronization module for [Maho](https://github.com/mahocommerce/maho) and OpenMage. Enables seamless data migration and continuous synchronization between OpenMage/Maho instances.
 
 ## Features
