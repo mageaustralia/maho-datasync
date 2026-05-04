@@ -909,6 +909,16 @@ class Maho_DataSync_Model_Entity_Product extends Maho_DataSync_Model_Entity_Abst
             $this->_addTiming('categories', microtime(true) - $t0);
         }
 
+        // Update website assignments directly
+        if (!empty($data['website_ids'])) {
+            $t0 = microtime(true);
+            $websiteIds = $this->_resolveWebsiteIds($data);
+            if (!empty($websiteIds)) {
+                $this->_updateProductWebsitesDirect($productId, $websiteIds);
+            }
+            $this->_addTiming('websites', microtime(true) - $t0);
+        }
+
         // Handle tier prices
         if (!empty($data['tier_prices'])) {
             $t0 = microtime(true);
@@ -1093,6 +1103,43 @@ class Maho_DataSync_Model_Entity_Product extends Maho_DataSync_Model_Entity_Abst
         if (!empty($toRemove)) {
             $write->delete($table, sprintf(
                 'product_id = %d AND category_id IN (%s)',
+                $productId,
+                implode(',', array_map('intval', $toRemove)),
+            ));
+        }
+    }
+
+    /**
+     * Update product website assignments directly without loading full model
+     */
+    protected function _updateProductWebsitesDirect(int $productId, array $websiteIds): void
+    {
+        $resource = Mage::getSingleton('core/resource');
+        $write = $resource->getConnection('core_write');
+        $table = $resource->getTableName('catalog/product_website');
+
+        $existing = $write->fetchCol(
+            "SELECT website_id FROM {$table} WHERE product_id = ?",
+            [$productId],
+        );
+
+        $toAdd    = array_diff($websiteIds, $existing);
+        $toRemove = array_diff($existing, $websiteIds);
+
+        foreach ($toAdd as $websiteId) {
+            try {
+                $write->insert($table, [
+                    'product_id' => $productId,
+                    'website_id' => (int) $websiteId,
+                ]);
+            } catch (Exception $e) {
+                // Ignore duplicates
+            }
+        }
+
+        if (!empty($toRemove)) {
+            $write->delete($table, sprintf(
+                'product_id = %d AND website_id IN (%s)',
                 $productId,
                 implode(',', array_map('intval', $toRemove)),
             ));
