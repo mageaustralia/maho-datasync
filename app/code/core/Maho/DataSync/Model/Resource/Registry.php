@@ -46,7 +46,7 @@ class Maho_DataSync_Model_Resource_Registry extends Mage_Core_Model_Resource_Db_
         }
 
         $adapter = $this->_getWriteAdapter();
-        $now = Mage_Core_Model_Locale::now();
+        $now = Mage_Core_Model_Locale::nowUtc();
 
         $data = [];
         foreach ($mappings as $mapping) {

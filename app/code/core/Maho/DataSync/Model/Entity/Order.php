@@ -121,7 +121,7 @@ class Maho_DataSync_Model_Entity_Order extends Maho_DataSync_Model_Entity_Abstra
         $this->_setCustomerData($order, $data);
 
         // Order dates
-        $order->setCreatedAt($this->_parseDate($data['created_at'] ?? null) ?? Mage_Core_Model_Locale::now());
+        $order->setCreatedAt($this->_parseDate($data['created_at'] ?? null) ?? Mage_Core_Model_Locale::nowUtc());
         if (!empty($data['updated_at'])) {
             $order->setUpdatedAt($this->_parseDate($data['updated_at']));
         }
@@ -194,7 +194,7 @@ class Maho_DataSync_Model_Entity_Order extends Maho_DataSync_Model_Entity_Abstra
             $order->setData('datasync_source_id', (int) $sourceId);
         }
         $order->setData('datasync_source_increment_id', $data['increment_id']);
-        $order->setData('datasync_imported_at', Mage_Core_Model_Locale::now());
+        $order->setData('datasync_imported_at', Mage_Core_Model_Locale::nowUtc());
 
         // Import addresses BEFORE first save (required by some observers)
         $this->_importAddresses($order, $data);
@@ -300,7 +300,7 @@ class Maho_DataSync_Model_Entity_Order extends Maho_DataSync_Model_Entity_Abstra
         $this->_importCustomFields($order, $data);
 
         // Update DataSync tracking
-        $order->setData('datasync_imported_at', Mage_Core_Model_Locale::now());
+        $order->setData('datasync_imported_at', Mage_Core_Model_Locale::nowUtc());
 
         try {
             $order->save();
@@ -1247,7 +1247,7 @@ class Maho_DataSync_Model_Entity_Order extends Maho_DataSync_Model_Entity_Abstra
             if (!empty($historyData['created_at'])) {
                 $history->setCreatedAt($this->_parseDate($historyData['created_at']));
             } else {
-                $history->setCreatedAt(Mage_Core_Model_Locale::now());
+                $history->setCreatedAt(Mage_Core_Model_Locale::nowUtc());
             }
 
             // Store source entity_id for tracking

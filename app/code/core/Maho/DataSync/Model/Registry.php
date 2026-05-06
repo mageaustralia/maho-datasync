@@ -168,7 +168,7 @@ class Maho_DataSync_Model_Registry extends Mage_Core_Model_Abstract
             // Update existing
             $existing->setTargetId($targetId)
                 ->setExternalRef($externalRef)
-                ->setSyncedAt(Mage_Core_Model_Locale::now())
+                ->setSyncedAt(Mage_Core_Model_Locale::nowUtc())
                 ->setMetadata($metadata ? json_encode($metadata) : null)
                 ->save();
         } else {
@@ -179,7 +179,7 @@ class Maho_DataSync_Model_Registry extends Mage_Core_Model_Abstract
                 'source_id' => $sourceId,
                 'target_id' => $targetId,
                 'external_ref' => $externalRef,
-                'synced_at' => Mage_Core_Model_Locale::now(),
+                'synced_at' => Mage_Core_Model_Locale::nowUtc(),
                 'metadata' => $metadata ? json_encode($metadata) : null,
             ])->save();
         }

@@ -136,7 +136,7 @@ class Maho_DataSync_Model_Entity_Shipment extends Maho_DataSync_Model_Entity_Abs
         }
 
         // Dates
-        $shipment->setCreatedAt($this->_parseDate($data['created_at'] ?? null) ?? Mage_Core_Model_Locale::now());
+        $shipment->setCreatedAt($this->_parseDate($data['created_at'] ?? null) ?? Mage_Core_Model_Locale::nowUtc());
         if (!empty($data['updated_at'])) {
             $shipment->setUpdatedAt($this->_parseDate($data['updated_at']));
         }
@@ -167,7 +167,7 @@ class Maho_DataSync_Model_Entity_Shipment extends Maho_DataSync_Model_Entity_Abs
             $shipment->setData('datasync_source_id', (int) $sourceId);
         }
         $shipment->setData('datasync_source_increment_id', $data['increment_id'] ?? null);
-        $shipment->setData('datasync_imported_at', Mage_Core_Model_Locale::now());
+        $shipment->setData('datasync_imported_at', Mage_Core_Model_Locale::nowUtc());
 
         // Save shipment first to get entity_id
         try {

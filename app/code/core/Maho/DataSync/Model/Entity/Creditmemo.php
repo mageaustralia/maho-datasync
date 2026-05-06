@@ -145,7 +145,7 @@ class Maho_DataSync_Model_Entity_Creditmemo extends Maho_DataSync_Model_Entity_A
         }
 
         // Dates
-        $creditmemo->setCreatedAt($this->_parseDate($data['created_at'] ?? null) ?? Mage_Core_Model_Locale::now());
+        $creditmemo->setCreatedAt($this->_parseDate($data['created_at'] ?? null) ?? Mage_Core_Model_Locale::nowUtc());
         if (!empty($data['updated_at'])) {
             $creditmemo->setUpdatedAt($this->_parseDate($data['updated_at']));
         }
@@ -203,7 +203,7 @@ class Maho_DataSync_Model_Entity_Creditmemo extends Maho_DataSync_Model_Entity_A
             $creditmemo->setData('datasync_source_id', (int) $sourceId);
         }
         $creditmemo->setData('datasync_source_increment_id', $data['increment_id'] ?? null);
-        $creditmemo->setData('datasync_imported_at', Mage_Core_Model_Locale::now());
+        $creditmemo->setData('datasync_imported_at', Mage_Core_Model_Locale::nowUtc());
 
         // Save credit memo first to get entity_id
         try {

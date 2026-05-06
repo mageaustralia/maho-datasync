@@ -117,7 +117,7 @@ class MyModule_DataSync_Model_Entity_MyEntity extends Maho_DataSync_Model_Entity
         // Set DataSync tracking
         $model->setData('datasync_source_system', $data['_source_system'] ?? 'import');
         $model->setData('datasync_source_id', $data['entity_id'] ?? null);
-        $model->setData('datasync_imported_at', Mage_Core_Model_Locale::now());
+        $model->setData('datasync_imported_at', Mage_Core_Model_Locale::nowUtc());
 
         $model->save();
 

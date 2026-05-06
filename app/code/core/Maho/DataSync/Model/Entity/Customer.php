@@ -172,7 +172,7 @@ class Maho_DataSync_Model_Entity_Customer extends Maho_DataSync_Model_Entity_Abs
         if ($sourceId) {
             $customer->setData('datasync_source_id', (int) $sourceId);
         }
-        $customer->setData('datasync_imported_at', Mage_Core_Model_Locale::now());
+        $customer->setData('datasync_imported_at', Mage_Core_Model_Locale::nowUtc());
 
         // Save customer
         try {

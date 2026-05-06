@@ -202,7 +202,7 @@ class Maho_DataSync_Model_Entity_Category extends Maho_DataSync_Model_Entity_Abs
         if ($sourceId) {
             $category->setData('datasync_source_id', (int) $sourceId);
         }
-        $category->setData('datasync_imported_at', Mage_Core_Model_Locale::now());
+        $category->setData('datasync_imported_at', Mage_Core_Model_Locale::nowUtc());
 
         // Save category
         try {
@@ -355,7 +355,7 @@ class Maho_DataSync_Model_Entity_Category extends Maho_DataSync_Model_Entity_Abs
         if ($sourceId) {
             $category->setData('datasync_source_id', (int) $sourceId);
         }
-        $category->setData('datasync_imported_at', Mage_Core_Model_Locale::now());
+        $category->setData('datasync_imported_at', Mage_Core_Model_Locale::nowUtc());
 
         // Save
         try {

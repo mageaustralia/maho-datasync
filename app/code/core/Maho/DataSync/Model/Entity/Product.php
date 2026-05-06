@@ -486,7 +486,7 @@ class Maho_DataSync_Model_Entity_Product extends Maho_DataSync_Model_Entity_Abst
         if ($sourceId) {
             $product->setData('datasync_source_id', (int) $sourceId);
         }
-        $product->setData('datasync_imported_at', Mage_Core_Model_Locale::now());
+        $product->setData('datasync_imported_at', Mage_Core_Model_Locale::nowUtc());
 
         // Save product
         $t0 = microtime(true);
@@ -676,7 +676,7 @@ class Maho_DataSync_Model_Entity_Product extends Maho_DataSync_Model_Entity_Abst
         if ($sourceId) {
             $product->setData('datasync_source_id', (int) $sourceId);
         }
-        $product->setData('datasync_imported_at', Mage_Core_Model_Locale::now());
+        $product->setData('datasync_imported_at', Mage_Core_Model_Locale::nowUtc());
 
         // Clear custom options before save if replacing (prevents validation errors from corrupted existing options)
         if (!empty($data['custom_options'])) {
@@ -876,7 +876,7 @@ class Maho_DataSync_Model_Entity_Product extends Maho_DataSync_Model_Entity_Abst
             $attrData['datasync_source_id'] = (int) $sourceId;
         }
         if (in_array('datasync_imported_at', $validAttrCodes)) {
-            $attrData['datasync_imported_at'] = Mage_Core_Model_Locale::now();
+            $attrData['datasync_imported_at'] = Mage_Core_Model_Locale::nowUtc();
         }
 
         // Bulk update attributes - much faster than model save

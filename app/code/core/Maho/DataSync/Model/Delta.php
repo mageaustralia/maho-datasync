@@ -115,9 +115,9 @@ class Maho_DataSync_Model_Delta extends Mage_Core_Model_Abstract
             'source_system' => $sourceSystem,
             'entity_type' => $entityType,
             'adapter_code' => $adapterCode,
-            'last_sync_at' => Mage_Core_Model_Locale::now(),
+            'last_sync_at' => Mage_Core_Model_Locale::nowUtc(),
             'last_entity_id' => $highestId,
-            'last_updated_at' => Mage_Core_Model_Locale::now(),
+            'last_updated_at' => Mage_Core_Model_Locale::nowUtc(),
             'sync_count' => $currentSyncCount + $result->getSuccessCount(),
             'error_count' => $currentErrorCount + $result->getErrorCount(),
             'last_error' => $result->hasErrors()

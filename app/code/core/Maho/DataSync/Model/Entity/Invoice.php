@@ -147,7 +147,7 @@ class Maho_DataSync_Model_Entity_Invoice extends Maho_DataSync_Model_Entity_Abst
         }
 
         // Dates
-        $invoice->setCreatedAt($this->_parseDate($data['created_at'] ?? null) ?? Mage_Core_Model_Locale::now());
+        $invoice->setCreatedAt($this->_parseDate($data['created_at'] ?? null) ?? Mage_Core_Model_Locale::nowUtc());
         if (!empty($data['updated_at'])) {
             $invoice->setUpdatedAt($this->_parseDate($data['updated_at']));
         }
@@ -192,7 +192,7 @@ class Maho_DataSync_Model_Entity_Invoice extends Maho_DataSync_Model_Entity_Abst
             $invoice->setData('datasync_source_id', (int) $sourceId);
         }
         $invoice->setData('datasync_source_increment_id', $data['increment_id'] ?? null);
-        $invoice->setData('datasync_imported_at', Mage_Core_Model_Locale::now());
+        $invoice->setData('datasync_imported_at', Mage_Core_Model_Locale::nowUtc());
 
         // Save invoice first to get entity_id
         try {
