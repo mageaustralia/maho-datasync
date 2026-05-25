@@ -178,6 +178,12 @@ class DatasyncSync extends Command
                 InputOption::VALUE_REQUIRED,
                 '[Product] Base path for copying local images',
             )
+            ->addOption(
+                'force-image-import',
+                null,
+                InputOption::VALUE_NONE,
+                '[Product] Force full image import on update (overrides skip_images_on_update default)',
+            )
             // Stock/Inventory options
             ->addOption(
                 'stock',
@@ -237,6 +243,9 @@ class DatasyncSync extends Command
             }
             if ($input->getOption('image-base-path')) {
                 $entityOptions['image_base_path'] = $input->getOption('image-base-path');
+            }
+            if ($input->getOption('force-image-import')) {
+                $entityOptions['skip_images_on_update'] = false;
             }
 
             // Create and configure engine
