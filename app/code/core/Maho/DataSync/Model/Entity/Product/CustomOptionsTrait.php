@@ -374,12 +374,32 @@ trait Maho_DataSync_Model_Entity_Product_CustomOptionsTrait
             $option->setImageSizeY($optionData['image_size_y']);
         }
 
-        // Set option values BEFORE save for select types (validation happens in _afterSave)
+        // Set option values BEFORE save for select types (validation happens in _afterSave).
+        //
+        // To keep `option_type_id` stable across syncs we match incoming values to existing
+        // values BY TITLE within this option and put the destination `option_type_id` back in
+        // the payload. Core's product-option save handler then UPDATEs the existing row in
+        // place instead of delete+recreate.
+        //
+        // This matters: option_type_id is referenced by historical order/quote item options
+        // and by 3rd-party dependent-option modules (e.g. Pektsekye-style
+        // optiondependent_value.option_type_id). Churning the IDs orphans all of them.
         if (!empty($optionData['values']) && in_array($optionData['type'], ['drop_down', 'radio', 'checkbox', 'multiple'])) {
-            // Strip source IDs from values to prevent FK constraint errors
+            $existingByTitle = [];
+            if ($option->getId()) {
+                foreach ($option->getValues() ?? [] as $existingValue) {
+                    $existingByTitle[strtolower((string) $existingValue->getTitle())] = (int) $existingValue->getId();
+                }
+            }
             $cleanValues = [];
             foreach ($optionData['values'] as $valueData) {
-                unset($valueData['option_type_id']); // Remove source ID
+                unset($valueData['option_type_id']); // strip SOURCE id
+                $titleKey = strtolower((string) ($valueData['title'] ?? ''));
+                if ($titleKey !== '' && isset($existingByTitle[$titleKey])) {
+                    // Reuse the DESTINATION id → core save UPDATEs this row (no churn).
+                    $valueData['option_type_id'] = $existingByTitle[$titleKey];
+                    unset($existingByTitle[$titleKey]);
+                }
                 $cleanValues[] = $valueData;
             }
             $option->setData('values', $cleanValues);
