@@ -28,9 +28,9 @@ use Symfony\Component\Console\Output\OutputInterface;
  * dev by more than --threshold days. Catches anything that bypassed the live
  * Maho_DataSyncTracker observers (direct SQL writes, imports, etc.).
  *
- * Currently DRY-RUN ONLY. Re-sync wiring deliberately deferred until DataSync
- * `_importCustomOptions` is fixed (replace -> merge + value-level title match)
- * so we don't churn option_type_ids during a recovery sweep.
+ * Without `--dry-run`, syncs each stale product via the same engine the
+ * incremental cron uses (`datasync/engine` + `datasync/adapter_openmage`,
+ * `on_duplicate=merge`, `entity_ids` filter), bypassing the live tracker.
  */
 #[AsCommand(
     name: 'datasync:resync-stale',
@@ -48,7 +48,8 @@ class DatasyncResyncStale extends Command
             ->addOption('type', null, InputOption::VALUE_REQUIRED, 'Filter dev type: configurable | simple | all (default all)', 'all')
             ->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Max stale products to report', '500')
             ->addOption('sku', null, InputOption::VALUE_REQUIRED, 'SKU LIKE pattern (e.g. KSM%)')
-            ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Preview only (currently the only mode)')
+            ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Preview only — no writes')
+            ->addOption('batch-size', null, InputOption::VALUE_REQUIRED, 'Engine sync batch size (default 50)', '50')
             ->addOption('db-host', null, InputOption::VALUE_REQUIRED, 'Live database host')
             ->addOption('db-name', null, InputOption::VALUE_REQUIRED, 'Live database name')
             ->addOption('db-user', null, InputOption::VALUE_REQUIRED, 'Live database user')
@@ -64,10 +65,13 @@ class DatasyncResyncStale extends Command
         $typeFilter = (string) $input->getOption('type');
         $limit = (int) $input->getOption('limit');
         $skuPattern = $input->getOption('sku');
+        $dryRun = (bool) $input->getOption('dry-run');
 
         $output->writeln('<info>DataSync: stale-product catch-up scan</info>');
         $output->writeln(sprintf('threshold=%dd  type=%s  limit=%d  sku=%s', $thresholdDays, $typeFilter, $limit, $skuPattern ?: '(any)'));
-        $output->writeln('<comment>DRY RUN — discovery only; re-sync wiring not implemented yet</comment>');
+        $output->writeln($dryRun
+            ? '<comment>DRY RUN — discovery only, no writes</comment>'
+            : '<comment>APPLY mode — will sync stale products via the engine (entity_ids filter)</comment>');
         $output->writeln('');
 
         try {
@@ -167,6 +171,59 @@ class DatasyncResyncStale extends Command
             ));
         }
         if (count($stale) > 25) $output->writeln(sprintf('  ... (%d more)', count($stale) - 25));
+
+        if ($dryRun) {
+            $output->writeln('');
+            $output->writeln('<comment>Dry run only — re-run without --dry-run to apply.</comment>');
+            return Command::SUCCESS;
+        }
+
+        // --- 6. apply: sync via the engine (same path as datasync:incremental) ---
+        $output->writeln('');
+        $output->writeln('<info>Applying re-sync via engine (source_system=live, on_duplicate=merge)</info>');
+
+        $batchSize = max(1, (int) $input->getOption('batch-size'));
+        $liveIds = array_map('intval', array_column($stale, 'live_id'));
+        $chunks = array_chunk($liveIds, $batchSize);
+        $created = 0; $merged = 0; $skipped = 0; $errs = 0;
+        $startedAt = microtime(true);
+
+        foreach ($chunks as $i => $chunkIds) {
+            $output->writeln(sprintf('  batch %d/%d (%d ids)…', $i + 1, count($chunks), count($chunkIds)));
+            try {
+                /** @var \Maho_DataSync_Model_Adapter_OpenMage $adapter */
+                $adapter = Mage::getModel('datasync/adapter_openmage');
+                $adapter->setDatabaseConnection($this->livePdo);
+
+                /** @var \Maho_DataSync_Model_Engine $engine */
+                $engine = Mage::getModel('datasync/engine');
+                $engine->setSourceAdapter($adapter)
+                    ->setSourceSystem('live')
+                    ->setOnDuplicate('merge')
+                    ->setSkipInvalid(true)
+                    ->setFilters(['entity_ids' => $chunkIds]);
+
+                $result = $engine->sync('product');
+                $created += $result->getCreated();
+                $merged += $result->getMerged();
+                $skipped += $result->getSkipped();
+                if ($result->hasErrors()) {
+                    foreach ($result->getErrors() as $err) {
+                        $errs++;
+                        $output->writeln('    <error>' . ($err['message'] ?? 'error') . '</error>');
+                    }
+                }
+            } catch (\Throwable $e) {
+                $errs++;
+                $output->writeln('  <error>batch failed: ' . $e->getMessage() . '</error>');
+            }
+        }
+        $elapsed = round(microtime(true) - $startedAt, 1);
+        $output->writeln('');
+        $output->writeln(sprintf(
+            '<info>Sync complete in %ss — created=%d merged=%d skipped=%d errors=%d</info>',
+            $elapsed, $created, $merged, $skipped, $errs,
+        ));
 
         return Command::SUCCESS;
     }
