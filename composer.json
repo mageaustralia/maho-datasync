@@ -20,8 +20,8 @@
     ],
     "homepage": "https://github.com/mageaustralia/maho-datasync",
     "require": {
-        "php": ">=8.2",
-        "mahocommerce/maho": ">=24.10.0"
+        "php": "^8.2",
+        "mahocommerce/maho": "^26.5"
     },
     "autoload": {
         "psr-0": {
