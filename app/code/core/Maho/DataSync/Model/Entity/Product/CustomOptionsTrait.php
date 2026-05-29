@@ -374,18 +374,57 @@ trait Maho_DataSync_Model_Entity_Product_CustomOptionsTrait
             $option->setImageSizeY($optionData['image_size_y']);
         }
 
-        // Set option values BEFORE save for select types (validation happens in _afterSave)
-        if (!empty($optionData['values']) && in_array($optionData['type'], ['drop_down', 'radio', 'checkbox', 'multiple'])) {
-            // Strip source IDs from values to prevent FK constraint errors
+        // Set option values BEFORE save for select types (validation happens in _afterSave).
+        //
+        // Merge-safe reconciliation: when updating an EXISTING option, match the
+        // incoming values to the option's existing values BY TITLE and reuse the
+        // existing option_type_id, so the core save UPDATEs each row in place
+        // instead of inserting a fresh one. Without this, every sync that revisits
+        // a product re-inserts the whole value set with stripped ids, so the
+        // option's values (drop_down / radio / checkbox / multiple) accumulate a
+        // duplicate copy on each incremental run. Reusing option_type_id also
+        // keeps it stable for historical order/quote selections and for
+        // dependent-option modules that reference it.
+        $orphanValues = [];
+        if (in_array($optionData['type'], ['drop_down', 'radio', 'checkbox', 'multiple'])) {
+            $existingByTitle = [];
+            if ($option->getId()) {
+                // A freshly loaded option does NOT auto-populate getValues();
+                // load its existing values together with their (store 0) titles.
+                $existingCollection = Mage::getModel('catalog/product_option_value')
+                    ->getValuesCollection($option);
+                foreach ($existingCollection as $existingValue) {
+                    $key = mb_strtolower(trim((string) $existingValue->getTitle()));
+                    if ($key !== '' && !isset($existingByTitle[$key])) {
+                        $existingByTitle[$key] = $existingValue;
+                    }
+                }
+            }
+
             $cleanValues = [];
-            foreach ($optionData['values'] as $valueData) {
-                unset($valueData['option_type_id']); // Remove source ID
+            foreach ($optionData['values'] ?? [] as $valueData) {
+                unset($valueData['option_type_id']); // strip SOURCE id
+                $key = mb_strtolower(trim((string) ($valueData['title'] ?? '')));
+                if ($key !== '' && isset($existingByTitle[$key])) {
+                    // Reuse the destination id => core UPDATEs this row in place.
+                    $valueData['option_type_id'] = (int) $existingByTitle[$key]->getId();
+                    unset($existingByTitle[$key]);
+                }
                 $cleanValues[] = $valueData;
             }
+
+            // Existing values whose title is no longer present in the source are
+            // removed after save so the option converges to the source set.
+            $orphanValues = $existingByTitle;
+
             $option->setData('values', $cleanValues);
         }
 
         $option->save();
+
+        foreach ($orphanValues as $orphanValue) {
+            $orphanValue->delete();
+        }
     }
 
     /**
