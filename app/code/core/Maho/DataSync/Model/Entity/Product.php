@@ -528,7 +528,10 @@ class Maho_DataSync_Model_Entity_Product extends Maho_DataSync_Model_Entity_Abst
         // Handle custom options
         if (!empty($data['custom_options'])) {
             $t0 = microtime(true);
-            $optionsMode = $data['_entity_options']['options_mode'] ?? 'replace';
+            // 'merge' (match by title, preserve option_id + option_type_id) is the safe default.
+            // 'replace' is destructive — every sync churns option_type_ids and orphans anything
+            // referencing them (historical order item options, dependent-option modules, etc.).
+            $optionsMode = $data['_entity_options']['options_mode'] ?? 'merge';
             $this->_importCustomOptions($product, $data['custom_options'], $optionsMode);
             $this->_addTiming('custom_options', microtime(true) - $t0);
         }
@@ -680,7 +683,10 @@ class Maho_DataSync_Model_Entity_Product extends Maho_DataSync_Model_Entity_Abst
 
         // Clear custom options before save if replacing (prevents validation errors from corrupted existing options)
         if (!empty($data['custom_options'])) {
-            $optionsMode = $data['_entity_options']['options_mode'] ?? 'replace';
+            // 'merge' (match by title, preserve option_id + option_type_id) is the safe default.
+            // 'replace' is destructive — every sync churns option_type_ids and orphans anything
+            // referencing them (historical order item options, dependent-option modules, etc.).
+            $optionsMode = $data['_entity_options']['options_mode'] ?? 'merge';
             if ($optionsMode === 'replace') {
                 foreach ($product->getProductOptionsCollection() as $option) {
                     $option->delete();
@@ -728,7 +734,10 @@ class Maho_DataSync_Model_Entity_Product extends Maho_DataSync_Model_Entity_Abst
         // Handle custom options
         if (!empty($data['custom_options'])) {
             $t0 = microtime(true);
-            $optionsMode = $data['_entity_options']['options_mode'] ?? 'replace';
+            // 'merge' (match by title, preserve option_id + option_type_id) is the safe default.
+            // 'replace' is destructive — every sync churns option_type_ids and orphans anything
+            // referencing them (historical order item options, dependent-option modules, etc.).
+            $optionsMode = $data['_entity_options']['options_mode'] ?? 'merge';
             $this->_importCustomOptions($product, $data['custom_options'], $optionsMode);
             $this->_addTiming('custom_options', microtime(true) - $t0);
         }
@@ -861,6 +870,18 @@ class Maho_DataSync_Model_Entity_Product extends Maho_DataSync_Model_Entity_Abst
                 if (in_array($frontendInput, ['select', 'multiselect']) && !empty($value) && !is_numeric($value)) {
                     $value = $this->_resolveOptionValue($attribute, $value);
                 }
+                // Don't overwrite a destination attribute with an empty value when the attribute
+                // has a non-empty default. Without this guard, an empty source value silently
+                // nulls UI-gating attributes like `options_container` (whose default is
+                // `container2`) — which hides every product option dropdown on the PDP, because
+                // catalog.xml's `unsetCallChild` / `ifEquals` logic unsets both option-container
+                // blocks when their `alias_in_layout` doesn't match the product's value.
+                if (($value === '' || $value === null)) {
+                    $default = $attribute->getDefaultValue();
+                    if ($default !== '' && $default !== null) {
+                        continue;
+                    }
+                }
                 $attrData[$key] = $value;
             }
         }
@@ -949,7 +970,10 @@ class Maho_DataSync_Model_Entity_Product extends Maho_DataSync_Model_Entity_Abst
         // Handle custom options - requires full model
         if (!empty($data['custom_options'])) {
             $t0 = microtime(true);
-            $optionsMode = $data['_entity_options']['options_mode'] ?? 'replace';
+            // 'merge' (match by title, preserve option_id + option_type_id) is the safe default.
+            // 'replace' is destructive — every sync churns option_type_ids and orphans anything
+            // referencing them (historical order item options, dependent-option modules, etc.).
+            $optionsMode = $data['_entity_options']['options_mode'] ?? 'merge';
             $this->_importCustomOptions($product, $data['custom_options'], $optionsMode);
             $this->_addTiming('custom_options', microtime(true) - $t0);
         }
