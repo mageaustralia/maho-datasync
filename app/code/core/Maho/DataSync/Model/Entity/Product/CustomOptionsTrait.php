@@ -376,36 +376,55 @@ trait Maho_DataSync_Model_Entity_Product_CustomOptionsTrait
 
         // Set option values BEFORE save for select types (validation happens in _afterSave).
         //
-        // To keep `option_type_id` stable across syncs we match incoming values to existing
-        // values BY TITLE within this option and put the destination `option_type_id` back in
-        // the payload. Core's product-option save handler then UPDATEs the existing row in
-        // place instead of delete+recreate.
-        //
-        // This matters: option_type_id is referenced by historical order/quote item options
-        // and by 3rd-party dependent-option modules (e.g. Pektsekye-style
-        // optiondependent_value.option_type_id). Churning the IDs orphans all of them.
-        if (!empty($optionData['values']) && in_array($optionData['type'], ['drop_down', 'radio', 'checkbox', 'multiple'])) {
+        // Merge-safe reconciliation: when updating an EXISTING option, match the
+        // incoming values to the option's existing values BY TITLE and reuse the
+        // existing option_type_id, so the core save UPDATEs each row in place
+        // instead of inserting a fresh one. Without this, every sync that revisits
+        // a product re-inserts the whole value set with stripped ids, so the
+        // option's values (drop_down / radio / checkbox / multiple) accumulate a
+        // duplicate copy on each incremental run. Reusing option_type_id also
+        // keeps it stable for historical order/quote selections and for
+        // dependent-option modules that reference it.
+        $orphanValues = [];
+        if (in_array($optionData['type'], ['drop_down', 'radio', 'checkbox', 'multiple'])) {
             $existingByTitle = [];
             if ($option->getId()) {
-                foreach ($option->getValues() ?? [] as $existingValue) {
-                    $existingByTitle[strtolower((string) $existingValue->getTitle())] = (int) $existingValue->getId();
+                // A freshly loaded option does NOT auto-populate getValues();
+                // load its existing values together with their (store 0) titles.
+                $existingCollection = Mage::getModel('catalog/product_option_value')
+                    ->getValuesCollection($option);
+                foreach ($existingCollection as $existingValue) {
+                    $key = mb_strtolower(trim((string) $existingValue->getTitle()));
+                    if ($key !== '' && !isset($existingByTitle[$key])) {
+                        $existingByTitle[$key] = $existingValue;
+                    }
                 }
             }
+
             $cleanValues = [];
-            foreach ($optionData['values'] as $valueData) {
+            foreach ($optionData['values'] ?? [] as $valueData) {
                 unset($valueData['option_type_id']); // strip SOURCE id
-                $titleKey = strtolower((string) ($valueData['title'] ?? ''));
-                if ($titleKey !== '' && isset($existingByTitle[$titleKey])) {
-                    // Reuse the DESTINATION id → core save UPDATEs this row (no churn).
-                    $valueData['option_type_id'] = $existingByTitle[$titleKey];
-                    unset($existingByTitle[$titleKey]);
+                $key = mb_strtolower(trim((string) ($valueData['title'] ?? '')));
+                if ($key !== '' && isset($existingByTitle[$key])) {
+                    // Reuse the destination id => core UPDATEs this row in place.
+                    $valueData['option_type_id'] = (int) $existingByTitle[$key]->getId();
+                    unset($existingByTitle[$key]);
                 }
                 $cleanValues[] = $valueData;
             }
+
+            // Existing values whose title is no longer present in the source are
+            // removed after save so the option converges to the source set.
+            $orphanValues = $existingByTitle;
+
             $option->setData('values', $cleanValues);
         }
 
         $option->save();
+
+        foreach ($orphanValues as $orphanValue) {
+            $orphanValue->delete();
+        }
     }
 
     /**
