@@ -224,18 +224,33 @@ class Maho_DataSyncTracker_Model_Observer
      */
     public function cleanupOldRecords()
     {
+        $cutoff = date('Y-m-d H:i:s', strtotime('-30 days'));
+
+        // Log at entry so the run is visible even if it later errors or finds nothing.
+        // (#2: previously the only log was on success, so a job that never fired or
+        // failed early left no trace and old rows accumulated unnoticed.)
+        Mage::log("DataSyncTracker cleanup: starting, removing synced records older than {$cutoff}", Zend_Log::INFO, 'datasync.log');
+
         try {
             $resource = Mage::getSingleton('core/resource');
             $write = $resource->getConnection('core_write');
             $table = $resource->getTableName('datasync_change_tracker');
 
+            // Delete synced rows past the cutoff. Match on synced_at when set, and
+            // fall back to created_at when synced_at is NULL: a synced row should
+            // always carry synced_at, but guard against any path that set
+            // sync_completed=1 without it, which would otherwise never match
+            // (NULL < date is never true) and accumulate forever.
             $deleted = $write->delete($table, array(
                 'sync_completed = ?' => 1,
-                'synced_at < ?' => date('Y-m-d H:i:s', strtotime('-30 days'))
+                '(synced_at < ? OR (synced_at IS NULL AND created_at < ?))' => $cutoff,
             ));
 
-            Mage::log("DataSyncTracker cleanup: Deleted {$deleted} old synced records", Zend_Log::INFO, 'datasync.log');
+            Mage::log("DataSyncTracker cleanup: deleted {$deleted} old synced records (cutoff {$cutoff})", Zend_Log::INFO, 'datasync.log');
         } catch (Exception $e) {
+            // Make the failure loud in our own log too, not just the exception log,
+            // so "cleanup not working" is diagnosable from a single file.
+            Mage::log('DataSyncTracker cleanup: FAILED - ' . $e->getMessage(), Zend_Log::ERR, 'datasync.log');
             Mage::logException($e);
         }
     }
