@@ -21,9 +21,16 @@ This module is installed on your **SOURCE** OpenMage/Magento 1 system to track e
 | Credit Memo | Save |
 | Order Comments | Save |
 | Newsletter Subscriber | Save |
-| Product | Save, Delete |
+| Product | Save, Save Commit, Delete, Media/Gallery Save, Bulk Attribute Update |
 | Category | Save, Delete |
-| Stock | Save |
+| Stock | Save, Save Commit |
+
+Observers can't cover every write path (direct SQL `updated_at` bumps,
+`saveAttribute()` calls, parent rollups, 3rd-party connectors). A catch-all
+**reconciler cron** (every 10 minutes) compares each entity's source
+`updated_at` against the latest tracker row and flags anything newer, so drift
+is always caught after the fact. It covers Product, Category, and Customer
+(entities whose source table has an `updated_at` column).
 
 ## Installation
 

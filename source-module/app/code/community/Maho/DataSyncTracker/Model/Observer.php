@@ -219,6 +219,101 @@ class Maho_DataSyncTracker_Model_Observer
     }
 
     /**
+     * Track product media/gallery save (#1: bypass path)
+     *
+     * Image and gallery saves can go through catalog_product_media_save_after /
+     * catalog_product_gallery_save_after without firing catalog_product_save_after,
+     * so the product would otherwise never be flagged for re-sync after an image
+     * change. The event payload varies by caller, so resolve the product id
+     * defensively from whatever the event carries.
+     */
+    public function trackProductMedia(Varien_Event_Observer $observer)
+    {
+        $productId = null;
+
+        $product = $observer->getProduct();
+        if ($product && $product->getId()) {
+            $productId = $product->getId();
+        } elseif ($observer->getProductId()) {
+            $productId = $observer->getProductId();
+        } else {
+            // Some gallery events carry the gallery/value object instead.
+            $object = $observer->getObject() ?: $observer->getDataObject();
+            if ($object && $object->getProductId()) {
+                $productId = $object->getProductId();
+            }
+        }
+
+        $this->_track('product', $productId, 'update');
+    }
+
+    /**
+     * Reconcile tracker against source updated_at columns (#1: catch-all, called by cron).
+     *
+     * Observers can never cover every write path (direct SQL updated_at bumps,
+     * single-attribute saveAttribute() calls, parent rollups from a child stock
+     * change, 3rd-party connectors). This compares each entity's source
+     * updated_at against the latest tracker row and INSERTs a pending row for
+     * anything newer, so drift is always caught after the fact even when no
+     * event fired. Idempotent: the unique (entity_type, entity_id,
+     * sync_completed) index makes re-runs a no-op via ON DUPLICATE KEY UPDATE.
+     */
+    public function reconcileChanges()
+    {
+        Mage::log('DataSyncTracker reconcile: starting', Zend_Log::INFO, 'datasync.log');
+
+        // entity_type => [source table, id column on that table]
+        // Only entities whose source table has an updated_at column can be
+        // reconciled this way. cataloginventory_stock_item has no updated_at in
+        // Magento 1, so stock is intentionally omitted: stock writes are caught
+        // by trackStock(), and a parent rollup from a child stock change surfaces
+        // as a catalog_product_entity.updated_at bump, covered by 'product' below.
+        $entities = array(
+            'product'  => array('catalog_product_entity',  'entity_id'),
+            'category' => array('catalog_category_entity', 'entity_id'),
+            'customer' => array('customer_entity',         'entity_id'),
+        );
+
+        try {
+            $resource = Mage::getSingleton('core/resource');
+            $write = $resource->getConnection('core_write');
+            $tracker = $resource->getTableName('datasync_change_tracker');
+
+            foreach ($entities as $type => $def) {
+                list($sourceTable, $idColumn) = $def;
+                $source = $resource->getTableName($sourceTable);
+
+                // Insert a pending 'update' row for every source entity whose
+                // updated_at is newer than the most recent tracker row (of any
+                // sync state) for that entity. New entities (no tracker row at
+                // all) are covered by the COALESCE epoch fallback.
+                $sql = "
+                    INSERT INTO {$tracker} (entity_type, entity_id, action, created_at, sync_completed)
+                    SELECT ?, s.{$idColumn}, 'update', s.updated_at, 0
+                    FROM {$source} s
+                    LEFT JOIN (
+                        SELECT entity_id, MAX(created_at) AS last_tracked
+                        FROM {$tracker}
+                        WHERE entity_type = ?
+                        GROUP BY entity_id
+                    ) t ON t.entity_id = s.{$idColumn}
+                    WHERE s.updated_at > COALESCE(t.last_tracked, '1970-01-01 00:00:00')
+                    ON DUPLICATE KEY UPDATE
+                        created_at = VALUES(created_at),
+                        sync_completed = 0
+                ";
+
+                $result = $write->query($sql, array($type, $type));
+                $count = $result->rowCount();
+                Mage::log("DataSyncTracker reconcile: {$type} flagged {$count} row(s)", Zend_Log::INFO, 'datasync.log');
+            }
+        } catch (Exception $e) {
+            Mage::log('DataSyncTracker reconcile: FAILED - ' . $e->getMessage(), Zend_Log::ERR, 'datasync.log');
+            Mage::logException($e);
+        }
+    }
+
+    /**
      * Cleanup old synced records (called by cron)
      * Removes records that have been synced and are older than 30 days
      */

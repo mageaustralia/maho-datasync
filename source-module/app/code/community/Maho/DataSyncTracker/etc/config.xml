@@ -8,7 +8,7 @@
 <config>
     <modules>
         <Maho_DataSyncTracker>
-            <version>1.0.0</version>
+            <version>1.1.0</version>
         </Maho_DataSyncTracker>
     </modules>
     <global>
@@ -128,6 +128,33 @@
                     </maho_datasynctracker_product_delete>
                 </observers>
             </catalog_product_delete_after>
+            <!-- Bypass paths (#1): some 3rd-party modules dispatch only the
+                 commit_after variant, and image/gallery saves can skip
+                 product_save_after entirely. -->
+            <catalog_product_save_commit_after>
+                <observers>
+                    <maho_datasynctracker_product_commit>
+                        <class>maho_datasynctracker/observer</class>
+                        <method>trackProduct</method>
+                    </maho_datasynctracker_product_commit>
+                </observers>
+            </catalog_product_save_commit_after>
+            <catalog_product_media_save_after>
+                <observers>
+                    <maho_datasynctracker_product_media>
+                        <class>maho_datasynctracker/observer</class>
+                        <method>trackProductMedia</method>
+                    </maho_datasynctracker_product_media>
+                </observers>
+            </catalog_product_media_save_after>
+            <catalog_product_gallery_save_after>
+                <observers>
+                    <maho_datasynctracker_product_gallery>
+                        <class>maho_datasynctracker/observer</class>
+                        <method>trackProductMedia</method>
+                    </maho_datasynctracker_product_gallery>
+                </observers>
+            </catalog_product_gallery_save_after>
             <catalog_category_save_after>
                 <observers>
                     <maho_datasynctracker_category>
@@ -154,6 +181,14 @@
                     </maho_datasynctracker_stock>
                 </observers>
             </cataloginventory_stock_item_save_after>
+            <cataloginventory_stock_item_save_commit_after>
+                <observers>
+                    <maho_datasynctracker_stock_commit>
+                        <class>maho_datasynctracker/observer</class>
+                        <method>trackStock</method>
+                    </maho_datasynctracker_stock_commit>
+                </observers>
+            </cataloginventory_stock_item_save_commit_after>
         </events>
     </global>
     <crontab>
@@ -166,6 +201,17 @@
                     <model>maho_datasynctracker/observer::cleanupOldRecords</model>
                 </run>
             </maho_datasynctracker_cleanup>
+            <!-- Catch-all reconciler (#1): flags entities whose source updated_at
+                 moved without an event firing (direct SQL, saveAttribute, parent
+                 rollups, 3rd-party connectors). Idempotent; safe to run often. -->
+            <maho_datasynctracker_reconcile>
+                <schedule>
+                    <cron_expr>*/10 * * * *</cron_expr>
+                </schedule>
+                <run>
+                    <model>maho_datasynctracker/observer::reconcileChanges</model>
+                </run>
+            </maho_datasynctracker_reconcile>
         </jobs>
     </crontab>
 </config>
