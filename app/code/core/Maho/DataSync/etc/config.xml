@@ -270,6 +270,43 @@
                 <schedule>0 */4 * * *</schedule> <!-- Every 4 hours -->
                 <entity_types>customer,order</entity_types>
             </cron>
+            <!--
+                Delete handling — controls what the destination does when a
+                tracker row arrives with action='delete'.
+
+                enabled:
+                    0 = legacy behaviour, silently mark tracker row synced
+                        and leave the destination entity in place. Use this
+                        only during a migration cutover when you want the
+                        destination to ignore source deletes.
+                    1 = act on the delete (default).
+
+                mode (when enabled=1):
+                    hard = call Mage_*Model::delete() on the destination
+                           entity. Removes the row + EAV + relations + URL
+                           rewrites + indexer entries. Mirrors source.
+                    soft = leave the row in place but mark it removed from
+                           customer view. For products/categories that means
+                           status=disabled, visibility=Not Visible Individually,
+                           is_active=0. For customers it means is_active=0.
+                           Safer when downstream systems hold references.
+
+                soft_for_customer (regardless of mode):
+                    Customers carry order/refund history that breaks if the
+                    customer row is gone. Default-on so customer deletes are
+                    always disabled-not-removed unless explicitly overridden.
+
+                Skip configuration:
+                    Hard delete is final. Disable per-entity-type by
+                    listing them in skip_entity_types (comma-separated).
+                    Example: skip_entity_types=customer,order
+            -->
+            <delete_handling>
+                <enabled>1</enabled>
+                <mode>hard</mode>
+                <soft_for_customer>1</soft_for_customer>
+                <skip_entity_types></skip_entity_types>
+            </delete_handling>
         </datasync>
     </default>
 </config>
