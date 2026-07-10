@@ -33,7 +33,15 @@ use Symfony\Component\Console\Output\OutputInterface;
  * ordered-quantity search ranking, bestseller reports, recommendations, cross-sells.
  *
  * This command rebuilds the source_id -> entity_id map from `datasync_source_id`
- * and rewrites the affected columns. It previews by default; pass --apply to write.
+ * and rewrites `sales_flat_order_item.product_id`. It previews by default; pass
+ * --apply to write.
+ *
+ * ONLY rows DataSync imported are touched, identified by their order carrying a
+ * `datasync_source_id`. That restriction is the whole safety argument. A row this
+ * installation created itself already references a local entity_id, and remapping
+ * it would move a correct reference onto a different product: `sales_flat_quote_item`,
+ * `wishlist_item` and `report_viewed_product_index` are written by ordinary browsing
+ * and checkout here, so they are deliberately out of scope. Do not add them.
  *
  * Take a database backup first. This edits historical sales data.
  */
@@ -43,32 +51,14 @@ use Symfony\Component\Console\Output\OutputInterface;
 )]
 class DatasyncRemapProductIds extends Command
 {
-    /**
-     * Phase 1 parks rewritten values above this offset so a mapping whose source
-     * id equals another product's local id cannot cascade onto rows this run has
-     * already touched. Phase 2 subtracts it. Must exceed every real product id.
-     */
-    private const OFFSET = 1_000_000;
-
     private const MARKER_PATH = 'datasync/remap/product_ids_applied_at';
-
-    /** @var array<string, string> table => column holding a catalog product id */
-    private const TABLES = [
-        'sales_flat_order_item' => 'product_id',
-        'sales_flat_quote_item' => 'product_id',
-        'wishlist_item' => 'product_id',
-        'report_viewed_product_index' => 'product_id',
-        'report_compared_product_index' => 'product_id',
-    ];
 
     #[\Override]
     protected function configure(): void
     {
         $this
             ->addOption('apply', null, InputOption::VALUE_NONE, 'Write the changes. Without this, preview only')
-            ->addOption('force', null, InputOption::VALUE_NONE, 'Apply even though a previous run is recorded')
-            ->addOption('tables', null, InputOption::VALUE_REQUIRED, 'Comma-separated subset of tables to touch')
-            ->addOption('include-report-event', null, InputOption::VALUE_NONE, 'Also remap report_event.object_id (see notes)');
+            ->addOption('force', null, InputOption::VALUE_NONE, 'Apply even though a previous run is recorded');
     }
 
     #[\Override]
@@ -93,31 +83,24 @@ class DatasyncRemapProductIds extends Command
             return Command::SUCCESS;
         }
 
-        $maxLocalId = (int) $conn->fetchOne('SELECT MAX(entity_id) FROM ' . $conn->quoteIdentifier('catalog_product_entity'));
-        if ($maxLocalId >= self::OFFSET) {
-            $output->writeln('<error>Product ids reach ' . $maxLocalId . ', which collides with the parking offset.</error>');
-            return Command::FAILURE;
-        }
-
         $output->writeln(sprintf('Mappings where the source id differs from the local id: <info>%d</info>', count($map)));
-        $output->writeln('');
 
-        $tables = $this->tablesToProcess($input);
-        $totalAffected = 0;
+        $itemIds = $this->collectImportedItemIds($conn, $map);
+        $skipped = $this->countLocallyCreated($conn, $map);
 
-        foreach ($tables as $table => $column) {
-            if (!$this->tableExists($conn, $table)) {
-                $output->writeln(sprintf('  %-32s <comment>absent, skipped</comment>', $table));
-                continue;
-            }
-            $affected = $this->countAffected($conn, $table, $column, $map);
-            $totalAffected += $affected;
-            $rows = (int) $conn->fetchOne('SELECT COUNT(*) FROM ' . $conn->quoteIdentifier($table));
-            $output->writeln(sprintf('  %-32s %-10s rows, %s would change', $table, $rows, $affected));
+        $output->writeln(sprintf('Order items DataSync imported that point at a stale id: <info>%d</info>', count($itemIds)));
+        if ($skipped > 0) {
+            $output->writeln(sprintf(
+                '<comment>Leaving %d row(s) alone: their order carries no datasync_source_id, so DataSync</comment>',
+                $skipped,
+            ));
+            $output->writeln('<comment>did not import them and their product_id is not assumed to be a source id.</comment>');
         }
 
-        $output->writeln('');
-        $output->writeln(sprintf('Rows to rewrite: <info>%d</info>', $totalAffected));
+        if ($itemIds === []) {
+            $output->writeln('<info>Nothing to rewrite.</info>');
+            return Command::SUCCESS;
+        }
 
         if (!$apply) {
             $output->writeln('');
@@ -125,18 +108,81 @@ class DatasyncRemapProductIds extends Command
             return Command::SUCCESS;
         }
 
-        foreach ($tables as $table => $column) {
-            if (!$this->tableExists($conn, $table)) {
-                continue;
-            }
-            $written = $this->remap($conn, $table, $column, $map);
-            $output->writeln(sprintf('  %-32s rewrote %d row(s)', $table, $written));
-        }
+        $written = $this->remapItems($conn, $itemIds, $map);
+        $output->writeln(sprintf('Rewrote <info>%d</info> row(s) in sales_flat_order_item.', $written));
 
         Mage::getModel('core/config')->saveConfig(self::MARKER_PATH, Mage_Core_Model_Locale::nowUtc(), 'default', 0);
         $output->writeln('');
         $output->writeln('<info>Done.</info> Reindex Meilisearch so the corrected ordered_qty reaches the index.');
         return Command::SUCCESS;
+    }
+
+    /**
+     * item_id list for imported order items whose product_id is a stale source id.
+     *
+     * Scoped through sales_flat_order.datasync_source_id. Only an imported order is
+     * known to carry source entity_ids; for anything else the product_id means
+     * whatever it meant when the row was written, and rewriting it would be a guess.
+     *
+     * @param array<int, int> $map
+     * @return array<int, int>
+     */
+    private function collectImportedItemIds(\Maho\Db\Adapter\AbstractPdoAdapter $conn, array $map): array
+    {
+        $ids = [];
+        foreach (array_chunk(array_keys($map), 500) as $chunk) {
+            $select = $conn->select()
+                ->from(['oi' => 'sales_flat_order_item'], ['item_id', 'product_id'])
+                ->join(['o' => 'sales_flat_order'], 'o.entity_id = oi.order_id', [])
+                ->where('o.datasync_source_id IS NOT NULL')
+                ->where('oi.product_id IN (?)', $chunk);
+            foreach ($conn->fetchAll($select) as $row) {
+                $ids[(int) $row['item_id']] = (int) $row['product_id'];
+            }
+        }
+        return $ids;
+    }
+
+    /** @param array<int, int> $map */
+    private function countLocallyCreated(\Maho\Db\Adapter\AbstractPdoAdapter $conn, array $map): int
+    {
+        $total = 0;
+        foreach (array_chunk(array_keys($map), 500) as $chunk) {
+            $select = $conn->select()
+                ->from(['oi' => 'sales_flat_order_item'], ['n' => 'COUNT(*)'])
+                ->join(['o' => 'sales_flat_order'], 'o.entity_id = oi.order_id', [])
+                ->where('o.datasync_source_id IS NULL')
+                ->where('oi.product_id IN (?)', $chunk);
+            $total += (int) $conn->fetchOne($select);
+        }
+        return $total;
+    }
+
+    /**
+     * Rewrite by item_id, so scoping is exact and a mapping cannot cascade onto a
+     * row an earlier mapping already moved.
+     *
+     * @param array<int, int> $itemIds item_id => current (stale) product_id
+     * @param array<int, int> $map
+     */
+    private function remapItems(\Maho\Db\Adapter\AbstractPdoAdapter $conn, array $itemIds, array $map): int
+    {
+        $written = 0;
+        $conn->beginTransaction();
+        try {
+            foreach ($itemIds as $itemId => $staleId) {
+                $written += $conn->update(
+                    'sales_flat_order_item',
+                    ['product_id' => $map[$staleId]],
+                    ['item_id = ?' => $itemId],
+                );
+            }
+            $conn->commit();
+        } catch (\Throwable $e) {
+            $conn->rollBack();
+            throw $e;
+        }
+        return $written;
     }
 
     /**
@@ -173,83 +219,5 @@ class DatasyncRemapProductIds extends Command
             $map[$source] = (int) $row['local_id'];
         }
         return $map;
-    }
-
-    /** @return array<string, string> */
-    private function tablesToProcess(InputInterface $input): array
-    {
-        $tables = self::TABLES;
-        if ($input->getOption('include-report-event')) {
-            // object_id only means a product for product-scoped event types, so
-            // this stays opt-in.
-            $tables['report_event'] = 'object_id';
-        }
-        $only = $input->getOption('tables');
-        if ($only) {
-            $wanted = array_map('trim', explode(',', (string) $only));
-            $tables = array_intersect_key($tables, array_flip($wanted));
-        }
-        return $tables;
-    }
-
-    private function tableExists(\Maho\Db\Adapter\AbstractPdoAdapter $conn, string $table): bool
-    {
-        try {
-            $conn->fetchOne('SELECT 1 FROM ' . $conn->quoteIdentifier($table) . ' LIMIT 1');
-            return true;
-        } catch (\Throwable) {
-            return false;
-        }
-    }
-
-    /** @param array<int, int> $map */
-    private function countAffected(\Maho\Db\Adapter\AbstractPdoAdapter $conn, string $table, string $column, array $map): int
-    {
-        $quotedTable = $conn->quoteIdentifier($table);
-        $quotedColumn = $conn->quoteIdentifier($column);
-        $total = 0;
-        foreach (array_chunk(array_keys($map), 500) as $chunk) {
-            $placeholders = implode(',', array_fill(0, count($chunk), '?'));
-            $total += (int) $conn->fetchOne(
-                "SELECT COUNT(*) FROM {$quotedTable} WHERE {$quotedColumn} IN ({$placeholders})",
-                $chunk,
-            );
-        }
-        return $total;
-    }
-
-    /**
-     * Two phases so a mapping cannot cascade onto rows an earlier mapping in the
-     * same run already rewrote: park every new value above OFFSET, then drop it
-     * back down. Portable: no UPDATE ... JOIN.
-     *
-     * @param array<int, int> $map
-     */
-    private function remap(\Maho\Db\Adapter\AbstractPdoAdapter $conn, string $table, string $column, array $map): int
-    {
-        $quotedTable = $conn->quoteIdentifier($table);
-        $quotedColumn = $conn->quoteIdentifier($column);
-        $written = 0;
-
-        $conn->beginTransaction();
-        try {
-            foreach ($map as $sourceId => $localId) {
-                $written += $conn->update(
-                    $table,
-                    [$column => $localId + self::OFFSET],
-                    [$quotedColumn . ' = ?' => $sourceId],
-                );
-            }
-            $conn->query(
-                "UPDATE {$quotedTable} SET {$quotedColumn} = {$quotedColumn} - ? WHERE {$quotedColumn} > ?",
-                [self::OFFSET, self::OFFSET],
-            );
-            $conn->commit();
-        } catch (\Throwable $e) {
-            $conn->rollBack();
-            throw $e;
-        }
-
-        return $written;
     }
 }
