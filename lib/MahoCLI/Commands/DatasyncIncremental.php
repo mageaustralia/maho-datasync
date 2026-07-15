@@ -434,6 +434,11 @@ class DatasyncIncremental extends Command
             [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                // Prevent a stalled/severed live-DB read (source-side backup, DB restart,
+                // idle firewall drop) from hanging the incremental sync forever and holding
+                // the lock. Without these a broken socket blocks in poll() indefinitely.
+                PDO::ATTR_TIMEOUT => 10,               // connect timeout (seconds)
+                PDO::MYSQL_ATTR_READ_TIMEOUT => 300,   // per-read timeout - stalled reads fail fast
             ],
         );
     }
