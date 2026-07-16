@@ -167,11 +167,10 @@ class Maho_DataSync_Model_Adapter_Openmage extends Maho_DataSync_Model_Adapter_A
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false,
-            // Prevent a stalled/severed live-DB read (e.g. a source-side backup, DB restart
-            // or idle firewall drop) from hanging the whole sync forever and holding the lock.
-            // Without these a broken socket blocks in poll() indefinitely.
+            // Connect timeout so an unreachable source fails fast instead of hanging.
+            // PDO MySQL has no portable per-read timeout constant, so read/stall hangs
+            // must be bounded by the caller (e.g. a cron `timeout` wrapper).
             PDO::ATTR_TIMEOUT => 10,               // connect timeout (seconds)
-            PDO::MYSQL_ATTR_READ_TIMEOUT => 300,   // per-read timeout - stalled reads fail fast
         ];
 
         try {
