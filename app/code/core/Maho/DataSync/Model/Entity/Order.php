@@ -895,6 +895,17 @@ class Maho_DataSync_Model_Entity_Order extends Maho_DataSync_Model_Entity_Abstra
             $item->setName($this->_cleanString($itemData['name'] ?? $itemData['sku'] ?? ''));
             $item->setProductType($itemData['product_type'] ?? 'simple');
 
+            // Selected options: configurable super-attributes (e.g. Grip Size) + custom
+            // options (String / Tension / Cover ...). Copied VERBATIM from the source —
+            // Mage_Sales_Model_Order_Item::getProductOptions() reads via the smart
+            // core/string::unserialize(), which handles both legacy PHP-serialized and
+            // JSON, so no conversion is needed. Do NOT use setProductOptions(): that
+            // expects an array and jsonEncodes it, which would double-encode the string.
+            // Without this the admin / PDF / email item rows show only the SKU.
+            if (!empty($itemData['product_options'])) {
+                $item->setData('product_options', $itemData['product_options']);
+            }
+
             // Quantities
             $item->setQtyOrdered((float) ($itemData['qty_ordered'] ?? 1));
             $item->setQtyInvoiced((float) ($itemData['qty_invoiced'] ?? 0));
