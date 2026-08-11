@@ -819,3 +819,52 @@ php shell/indexer.php --reindex
 ```
 
 **Note**: No emails are sent during import. Order confirmations, invoice emails, and shipment notifications are automatically suppressed.
+
+---
+
+## Incremental Sync: Delete Handling
+
+When the source system deletes an entity, the source tracker writes a row with
+`action='delete'` and a portable `source_identifier` (SKU for products, email
+for customers, url_key for categories). The destination's `datasync:incremental`
+command mirrors that delete to keep both systems in sync.
+
+### Behaviour
+
+| `datasync/delete_handling/...` | Default | Effect |
+|---|---|---|
+| `enabled` | `1` | Master switch. Set to `0` to ignore source deletes (legacy behaviour pre-1.2.0). |
+| `mode` | `hard` | `hard` calls `Mage_*Model::delete()` on the destination — removes the row, EAV values, relations, URL rewrites, indexer entries. `soft` flips status/visibility/is_active to a disabled state but leaves the row in place. |
+| `soft_for_customer` | `1` | Customers carry order history. When `1`, customer deletes are always soft regardless of `mode`. |
+| `skip_entity_types` | `` | Comma-separated list of entity types to leave untouched, e.g. `customer,order`. |
+
+### Setting from CLI
+
+```bash
+# Hard-delete everything (default — what you want when dev mirrors live)
+./maho config:set datasync/delete_handling/enabled 1
+./maho config:set datasync/delete_handling/mode hard
+
+# Conservative — disable instead of delete
+./maho config:set datasync/delete_handling/mode soft
+
+# Revert to pre-1.2.0 behaviour (ignore source deletes entirely)
+./maho config:set datasync/delete_handling/enabled 0
+
+# Mirror everything except customers
+./maho config:set datasync/delete_handling/skip_entity_types customer
+```
+
+### Why portable identifiers matter
+
+Source-side entity_ids drift from destination-side entity_ids the moment DataSync
+imports anything, and after a source row is deleted the entity_id alone is
+useless for lookup (the row is gone, so the destination can't query live for
+the SKU/email by id). The 1.2.0 schema added `source_identifier` to capture
+that handle at delete time so the destination can resolve the matching row by
+SKU/email/url_key.
+
+Pre-1.2.0 tracker rows without `source_identifier` are best-effort: the
+destination tries to read the live source row by entity_id; if it's already
+gone, it logs and skips. Run a one-shot reconciliation sweep to catch up any
+backlog after the upgrade.

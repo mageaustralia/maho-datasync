@@ -18,9 +18,12 @@ class Maho_DataSyncTracker_Model_Observer
      * @param string $type Entity type (customer, order, invoice, etc.)
      * @param int $entityId Entity ID
      * @param string $action Action type (create, update, delete)
+     * @param string|null $sourceIdentifier Portable identifier (SKU/email/name).
+     *                    Captured at delete time so the destination can resolve
+     *                    the entity after the source row is gone.
      * @return void
      */
-    protected function _track($type, $entityId, $action = 'update')
+    protected function _track($type, $entityId, $action = 'update', $sourceIdentifier = null)
     {
         if (!$entityId) {
             return;
@@ -31,16 +34,20 @@ class Maho_DataSyncTracker_Model_Observer
             $write = $resource->getConnection('core_write');
             $table = $resource->getTableName('datasync_change_tracker');
 
-            // Upsert: if entity already tracked and not synced, update timestamp
-            // If action is delete, always use delete (even if previous was create/update)
+            // Upsert: if entity already tracked and not synced, update timestamp.
+            // For action=delete, always overwrite the previous action so the
+            // destination doesn't try to apply a stale update over a tombstone.
+            // source_identifier is set only when provided (delete path); the
+            // COALESCE preserves an existing value across replays.
             $write->query("
-                INSERT INTO {$table} (entity_type, entity_id, action, created_at, sync_completed)
-                VALUES (?, ?, ?, NOW(), 0)
+                INSERT INTO {$table} (entity_type, entity_id, action, source_identifier, created_at, sync_completed)
+                VALUES (?, ?, ?, ?, NOW(), 0)
                 ON DUPLICATE KEY UPDATE
                     action = IF(VALUES(action) = 'delete', 'delete', action),
+                    source_identifier = COALESCE(VALUES(source_identifier), source_identifier),
                     created_at = NOW(),
                     sync_completed = 0
-            ", array($type, $entityId, $action));
+            ", array($type, $entityId, $action, $sourceIdentifier));
         } catch (Exception $e) {
             Mage::logException($e);
         }
@@ -58,11 +65,15 @@ class Maho_DataSyncTracker_Model_Observer
 
     /**
      * Track customer delete
+     *
+     * Capture the email at delete time — by the time the destination tries
+     * to mirror this, the source customer_entity row is gone and the
+     * entity_id alone is useless for lookup on the destination side.
      */
     public function trackCustomerDelete(Varien_Event_Observer $observer)
     {
         $customer = $observer->getCustomer();
-        $this->_track('customer', $customer->getId(), 'delete');
+        $this->_track('customer', $customer->getId(), 'delete', $customer->getEmail());
     }
 
     /**
@@ -168,11 +179,16 @@ class Maho_DataSyncTracker_Model_Observer
 
     /**
      * Track product delete
+     *
+     * Capture the SKU at delete time. After this observer fires the source
+     * catalog_product_entity row is removed, so by the time the destination
+     * pulls the tracker row the SKU is no longer recoverable from live by
+     * entity_id. The destination matches by SKU.
      */
     public function trackProductDelete(Varien_Event_Observer $observer)
     {
         $product = $observer->getProduct();
-        $this->_track('product', $product->getId(), 'delete');
+        $this->_track('product', $product->getId(), 'delete', $product->getSku());
     }
 
     /**
@@ -187,11 +203,17 @@ class Maho_DataSyncTracker_Model_Observer
 
     /**
      * Track category delete
+     *
+     * Capture the url_key at delete time — url_key is the destination's
+     * stable handle for a category once entity_ids diverge between source
+     * and destination. Falls back to the category name if url_key isn't set
+     * (e.g. legacy categories created before url_key became required).
      */
     public function trackCategoryDelete(Varien_Event_Observer $observer)
     {
-        $category = $observer->getCategory();
-        $this->_track('category', $category->getId(), 'delete');
+        $category   = $observer->getCategory();
+        $identifier = $category->getUrlKey() ?: $category->getName();
+        $this->_track('category', $category->getId(), 'delete', $identifier);
     }
 
     /**

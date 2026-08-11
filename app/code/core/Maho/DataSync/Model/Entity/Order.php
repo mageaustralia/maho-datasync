@@ -1181,36 +1181,97 @@ class Maho_DataSync_Model_Entity_Order extends Maho_DataSync_Model_Entity_Abstra
      * Results are cached for performance during bulk imports.
      */
     /**
-     * SKU-to-product-ID cache for order item import
+     * Resolved product-ID cache for order item import, keyed by "sourceId|sku"
      */
     protected static array $_skuProductIdCache = [];
 
     /**
-     * Resolve local product_id by SKU, falling back to source product_id
+     * Resolve the local product_id for an order item.
      *
-     * Source order items carry the source system's product_id which won't match
-     * the target catalog. Look up by SKU to get the correct local ID.
+     * The source system's product_id does not match the target catalog, so it has
+     * to be translated. `datasync_source_id` records exactly that translation and
+     * is the only key that identifies a product unambiguously, so it is tried
+     * first.
+     *
+     * SKU is a fallback, not the primary key, because it does not identify an
+     * order item's product. On a configurable order the PARENT row stores the
+     * CHILD's sku while pointing at the parent product:
+     *
+     *   parent_item_id NULL   product_type configurable   product_id 30347   sku 232026-4 3/8
+     *   parent_item_id 566539 product_type simple         product_id 30355   sku 232026-4 3/8
+     *
+     * Resolving that by sku lands both rows on the child, so the configurable
+     * parent -- the product customers actually search and browse -- is credited
+     * with none of its own sales. Ordered-quantity ranking, bestseller reports,
+     * recommendations and cross-sells all read these rows.
+     *
+     * Returns null when neither key resolves. Returning the unmapped source id
+     * would point the row at whichever local product happens to occupy that id.
      */
     protected function _resolveLocalProductId(string $sku, ?int $sourceProductId): ?int
     {
-        if ($sku === '') {
-            return $sourceProductId;
+        $cacheKey = ($sourceProductId ?? '-') . '|' . $sku;
+        if (array_key_exists($cacheKey, self::$_skuProductIdCache)) {
+            return self::$_skuProductIdCache[$cacheKey];
         }
 
-        if (isset(self::$_skuProductIdCache[$sku])) {
-            return self::$_skuProductIdCache[$sku];
+        $localId = $sourceProductId === null ? null : $this->_findProductBySourceId($sourceProductId);
+
+        if ($localId === null && $sku !== '') {
+            $resource = Mage::getSingleton('core/resource');
+            $found = $resource->getConnection('core_read')->fetchOne(
+                "SELECT entity_id FROM {$resource->getTableName('catalog/product')} WHERE sku = ?",
+                [$sku],
+            );
+            $localId = $found ? (int) $found : null;
         }
 
+        if ($localId === null) {
+            Mage::log(
+                sprintf(
+                    'DataSync: order item product unresolved (source product_id %s, sku %s) - product_id left null',
+                    $sourceProductId ?? 'null',
+                    $sku === '' ? '(none)' : $sku,
+                ),
+                Mage::LOG_NOTICE,
+                'datasync.log',
+            );
+        }
+
+        self::$_skuProductIdCache[$cacheKey] = $localId;
+        return $localId;
+    }
+
+    /**
+     * Local entity_id of the product imported from $sourceProductId, or null.
+     */
+    protected function _findProductBySourceId(int $sourceProductId): ?int
+    {
         $resource = Mage::getSingleton('core/resource');
         $read = $resource->getConnection('core_read');
-        $localId = $read->fetchOne(
-            "SELECT entity_id FROM {$resource->getTableName('catalog/product')} WHERE sku = ?",
-            [$sku],
+
+        $entityTypeId = (int) Mage::getSingleton('eav/config')
+            ->getEntityType(Mage_Catalog_Model_Product::ENTITY)
+            ->getId();
+
+        $attributeId = (int) $read->fetchOne(
+            "SELECT attribute_id FROM {$resource->getTableName('eav/attribute')}
+             WHERE attribute_code = ? AND entity_type_id = ?",
+            ['datasync_source_id', $entityTypeId],
+        );
+        if ($attributeId === 0) {
+            return null;
+        }
+
+        $ids = $read->fetchCol(
+            "SELECT entity_id FROM {$resource->getTableName('catalog/product')}_int
+             WHERE attribute_id = ? AND store_id = 0 AND value = ?",
+            [$attributeId, $sourceProductId],
         );
 
-        $result = $localId ? (int) $localId : $sourceProductId;
-        self::$_skuProductIdCache[$sku] = $result;
-        return $result;
+        // Two products claiming the same source id makes the choice arbitrary.
+        // Fall through to sku rather than pick one.
+        return count($ids) === 1 ? (int) $ids[0] : null;
     }
 
     protected function _isValidPaymentMethod(string $method): bool
@@ -1457,7 +1518,11 @@ class Maho_DataSync_Model_Entity_Order extends Maho_DataSync_Model_Entity_Abstra
                 }
 
                 $invoiceSku = $itemData['sku'] ?? '';
-                $item->setProductId($this->_resolveLocalProductId($invoiceSku, $itemData['product_id'] ?? ($orderItem ? $orderItem->getProductId() : null)));
+                // The order item's product_id is already translated to this catalog.
+                // Never feed it back in as a source id.
+                $item->setProductId($orderItem
+                    ? (int) $orderItem->getProductId()
+                    : $this->_resolveLocalProductId($invoiceSku, $itemData['product_id'] ?? null));
                 $item->setSku($invoiceSku);
                 $item->setName($itemData['name'] ?? ($orderItem ? $orderItem->getName() : ''));
                 $item->setQty((float) ($itemData['qty'] ?? 1));
@@ -1645,7 +1710,10 @@ class Maho_DataSync_Model_Entity_Order extends Maho_DataSync_Model_Entity_Abstra
                 }
 
                 $shipSku = $itemData['sku'] ?? '';
-                $item->setProductId($this->_resolveLocalProductId($shipSku, $itemData['product_id'] ?? ($orderItem ? $orderItem->getProductId() : null)));
+                // As above: prefer the order item's already-translated product_id.
+                $item->setProductId($orderItem
+                    ? (int) $orderItem->getProductId()
+                    : $this->_resolveLocalProductId($shipSku, $itemData['product_id'] ?? null));
                 $item->setSku($shipSku);
                 $item->setName($itemData['name'] ?? ($orderItem ? $orderItem->getName() : ''));
                 $item->setQty((float) ($itemData['qty'] ?? 1));
