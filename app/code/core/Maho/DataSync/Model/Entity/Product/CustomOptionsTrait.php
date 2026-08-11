@@ -140,6 +140,39 @@ trait Maho_DataSync_Model_Entity_Product_CustomOptionsTrait
                 Maho_DataSync_Helper_Data::LOG_LEVEL_DEBUG,
             );
         }
+
+        // A product with custom options must have a non-empty options_container,
+        // or the storefront renders neither the option dropdowns nor the add-to-cart
+        // button (the theme only outputs the option block when it is placed in
+        // container1/container2). Source feeds frequently omit this UI-gating
+        // attribute, leaving it NULL — so backfill it here as a safety net.
+        $this->_ensureOptionsContainer($product);
+    }
+
+    /**
+     * Guarantee a valid options_container on a product that has custom options.
+     *
+     * Only writes when the current value is missing/invalid, so an explicitly
+     * synced choice is never overwritten. Falls back to the attribute's own
+     * default (Magento ships 'container2' = "Block after Info Column").
+     */
+    protected function _ensureOptionsContainer(Mage_Catalog_Model_Product $product): void
+    {
+        $current = (string) $product->getOptionsContainer();
+        if (in_array($current, ['container1', 'container2'], true)) {
+            return;
+        }
+
+        $attribute = Mage::getSingleton('eav/config')->getAttribute('catalog_product', 'options_container');
+        $default = $attribute ? (string) $attribute->getDefaultValue() : '';
+        $value = in_array($default, ['container1', 'container2'], true) ? $default : 'container2';
+
+        $product->setOptionsContainer($value);
+        if ($product->getId()) {
+            // options_container is global scope — write to store 0.
+            Mage::getSingleton('catalog/product_action')
+                ->updateAttributes([$product->getId()], ['options_container' => $value], 0);
+        }
     }
 
     /**
