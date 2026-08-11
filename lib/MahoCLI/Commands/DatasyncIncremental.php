@@ -434,6 +434,10 @@ class DatasyncIncremental extends Command
             [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                // Connect timeout so an unreachable source fails fast instead of hanging.
+                // PDO MySQL has no portable per-read timeout constant, so read/stall hangs
+                // must be bounded by the caller (e.g. a cron `timeout` wrapper).
+                PDO::ATTR_TIMEOUT => 10,               // connect timeout (seconds)
             ],
         );
     }
